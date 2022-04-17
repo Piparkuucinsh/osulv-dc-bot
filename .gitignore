@@ -1,5 +1,4 @@
 stuff/
 db_backups/
 dcbot_env/
-users.db
 .env
