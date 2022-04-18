@@ -226,15 +226,15 @@ async def send_rolechange_msg(case, discord_id, role=0):
     channel = get(lvguild.channels, id=266580155860779009)
     member = get(lvguild.members, id=discord_id)
     if case == 'no_previous_role':
-        await channel.send(f'Spēlētājs {member.mention} ir grupā {role}.', allowed_mentions = discord.AllowedMentions(users = False))
+        await channel.send(f'Spēlētājs {member.display_name} ir grupā {role}.', allowed_mentions = discord.AllowedMentions(users = False))
     if case == 'pacelas':
-        await channel.send(f'Spēlētājs {member.mention} pacēlās uz grupu {role}.', allowed_mentions = discord.AllowedMentions(users = False))
+        await channel.send(f'Spēlētājs {member.display_name} pacēlās uz grupu {role}.', allowed_mentions = discord.AllowedMentions(users = False))
     if case == 'nokritas':
-        await channel.send(f'Spēlētājs {member.mention} nokrita uz grupu {role}.', allowed_mentions = discord.AllowedMentions(users = False))
+        await channel.send(f'Spēlētājs {member.display_name} nokrita uz grupu {role}.', allowed_mentions = discord.AllowedMentions(users = False))
     if case == 'restricted':
-        await channel.send(f'Spēlētājs {member.mention} kļuva restricted!', allowed_mentions = discord.AllowedMentions(users = False))
+        await channel.send(f'Spēlētājs {member.display_name} kļuva restricted!', allowed_mentions = discord.AllowedMentions(users = False))
     if case == 'inactive':
-        await channel.send(f'Spēlētājs {member.mention} ir kļuvis neaktīvs!', allowed_mentions = discord.AllowedMentions(users = False))
+        await channel.send(f'Spēlētājs {member.display_name} ir kļuvis neaktīvs!', allowed_mentions = discord.AllowedMentions(users = False))
 
 
 @bot.command()
@@ -324,6 +324,7 @@ async def refresh_roles(ctx):
             cursor = response['cursor']['page']
             ranking.extend(response['ranking'])
 
+        ranking_id_list = [x['user']['id'] for x in ranking]
 
         async with db.execute(f'SELECT * FROM players WHERE osu_id IS NOT NULL;') as query:
             result = await query.fetchall()
@@ -332,16 +333,11 @@ async def refresh_roles(ctx):
                 if row[0] not in member_id_list:
                     continue
 
-
-                inrange = False
-                for count, user in enumerate(ranking):
-                    if user['user']['id'] == row[1]:
-                        country_rank = count+1
-                        inrange = True
-                        break
-                           
-                if inrange == False:
+                try:
+                    country_rank = ranking_id_list.index(row[1]) + 1
+                except ValueError:
                     country_rank = 99999
+
 
                 current_role = [rev_roles[role.id] for role in get(lvguild.members, id=row[0]).roles if role.id in roles.values()]
 
