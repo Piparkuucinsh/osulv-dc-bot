@@ -125,7 +125,7 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 intents.presences = True
-bot = commands.Bot(intents=intents, command_prefix='$')
+bot = commands.Bot(intents=intents, command_prefix='!')
 
 @bot.command()
 async def token_reset(ctx):
@@ -516,6 +516,11 @@ async def crazy_func(ctx):
 async def desa(ctx):
     await ctx.send('<:desa:272418900111785985>')
 
+@bot.command()
+async def pervert(ctx):
+    await ctx.author.add_roles(get(lvguild.roles, id=141542874301988864))
+    print("added role")
+
 
 @bot.command()
 async def merge_db(ctx):
@@ -553,6 +558,7 @@ async def delete_duplicates(ctx):
         for row in result:
             print(row)
         await db.commit()
+
 
 bot.run(DISCORD_TOKEN)
 
