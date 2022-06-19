@@ -128,8 +128,10 @@ intents.message_content = True
 intents.presences = True
 bot = commands.Bot(intents=intents, command_prefix='!')
 
-@bot.command()
-async def token_reset(ctx):
+#@bot.command()
+@tasks.loop(hours=12)
+async def token_reset():
+    ctx = get(lvguild.channels, id=BOT_CHANNEL_ID)
     await osuapi.refresh_token(client_id=API_CLIENT_ID, client_secret=API_CLIENT_SECRET)
     await ctx.send('token reset')
 
@@ -153,6 +155,7 @@ async def on_ready():
 
     refresh_roles.start()
     link_acc.start()
+    token_reset.start()
 
 @bot.event
 async def on_member_join(member):
@@ -250,9 +253,8 @@ async def test_current_role(ctx, id_arg):
 
 @tasks.loop(minutes=5)
 #@bot.command()
-async def link_acc(ctx):
-    if ctx.channel.id != BOT_CHANNEL_ID:
-        return
+async def link_acc():
+    ctx = get(lvguild.channels, id=BOT_CHANNEL_ID)
     async with pool.acquire() as db:
         for guild in bot.guilds:
             for member in guild.members:
@@ -324,9 +326,8 @@ async def link_acc(ctx):
 
 @tasks.loop(minutes=60)    
 #@bot.command()
-async def refresh_roles(ctx):
-    if ctx.channel.id != BOT_CHANNEL_ID:
-        return
+async def refresh_roles():
+    ctx = get(lvguild.channels, id=BOT_CHANNEL_ID)
     async with pool.acquire() as db:
         cursor = ''
         ranking = []
