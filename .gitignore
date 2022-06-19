@@ -4,3 +4,4 @@ dcbot_env/
 .env
 users.db
 pg_test.py
+.vscode/
