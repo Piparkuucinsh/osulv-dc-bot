@@ -2,3 +2,5 @@ stuff/
 db_backups/
 dcbot_env/
 .env
+users.db
+pg_test.py
