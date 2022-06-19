@@ -151,6 +151,9 @@ async def on_ready():
     #pool = await asyncpg.create_pool('postgres://localhost', user='postgres', password='DAVISERGLIS')
     pool = await asyncpg.create_pool(DATABASE_URL, ssl='require')
 
+    refresh_roles.start()
+    link_acc.start()
+
 @bot.event
 async def on_member_join(member):
     guild = member.guild
@@ -245,8 +248,8 @@ async def test_current_role(ctx, id_arg):
     current_role = [rev_roles[role.id] for role in get(lvguild.members, id=int(id_arg)).roles if role.id in roles.values()]
     await ctx.send(f'{get(lvguild.members, id=int(id_arg)).mention} role ir {current_role[0]}', allowed_mentions = discord.AllowedMentions(users = False))
 
-#@tasks.loop(minutes=5)
-@bot.command()
+@tasks.loop(minutes=5)
+#@bot.command()
 async def link_acc(ctx):
     if ctx.channel.id != BOT_CHANNEL_ID:
         return
@@ -318,8 +321,9 @@ async def link_acc(ctx):
 
               
     await ctx.send(f'Kontu savienošanas operācija pabeigta.')
-    
-@bot.command()
+
+@tasks.loop(minutes=60)    
+#@bot.command()
 async def refresh_roles(ctx):
     if ctx.channel.id != BOT_CHANNEL_ID:
         return
@@ -335,6 +339,7 @@ async def refresh_roles(ctx):
 
         result = await db.fetch(f'SELECT * FROM players WHERE osu_id IS NOT NULL;')
         member_id_list = [x.id for x in lvguild.members]
+
         for row in result:
             if row[0] not in member_id_list:
                 continue
@@ -342,7 +347,9 @@ async def refresh_roles(ctx):
                 country_rank = ranking_id_list.index(row[1]) + 1
             except ValueError:
                 country_rank = 99999
+
             current_role = [rev_roles[role.id] for role in get(lvguild.members, id=row[0]).roles if role.id in roles.values()]
+
             if country_rank == 99999:
                 osu_user = await osuapi.get_user(name=row[1], mode='osu', key='id')
                 if osu_user == {'error': None}:
@@ -556,5 +563,17 @@ async def test(ctx):
     activities = get(lvguild.members, id=282548062700830720).activities
     print(activities)
 
+@bot.command()
+async def purge_roles(ctx):
+    async with pool.acquire() as db:
+        result = await db.fetch("SELECT discord_id FROM players WHERE osu_id IS NOT NULL;")
+        db_id_list = [x[0] for x in result]
+        for member in lvguild.members:
+            if member.id not in db_id_list:
+                current_role_id = [role.id for role in member.roles if role.id in roles.values()]
+                if current_role_id != []:
+                    await member.remove_roles(get(lvguild.roles, id=current_role_id[0]))
+                    await ctx.send(f'purged role for {member.display_name}')
+        
 bot.run(DISCORD_TOKEN)
 
