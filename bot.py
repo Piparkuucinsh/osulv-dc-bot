@@ -153,9 +153,9 @@ async def on_ready():
     #pool = await asyncpg.create_pool('postgres://localhost', user='postgres', password='DAVISERGLIS')
     pool = await asyncpg.create_pool(DATABASE_URL, ssl='require')
 
-    refresh_roles.start()
-    link_acc.start()
     token_reset.start()
+    link_acc.start()
+    refresh_roles.start()
 
 @bot.event
 async def on_member_join(member):
