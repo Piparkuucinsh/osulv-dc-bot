@@ -155,7 +155,7 @@ async def on_ready():
     pool = await asyncpg.create_pool(DATABASE_URL, ssl='require')
 
     token_reset.start()
-    asyncio.sleep(5)
+    await asyncio.sleep(5)
     link_acc.start()
     refresh_roles.start()
 
