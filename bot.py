@@ -5,6 +5,7 @@ from discord.ext import commands, tasks
 from discord.utils import get
 from dotenv import load_dotenv, set_key
 import aiohttp
+import asyncio
 
 
 load_dotenv()
@@ -61,26 +62,8 @@ async def get_role_with_rank(rank):
             return 'LVinf'
 
 
-        
-
-#parameters = {
-#            'client_id': API_CLIENT_ID,
-#            'client_secret': API_CLIENT_SECRET,
-#            'grant_type':'client_credentials',
-#            'scope':'public'
-#            }
-#request = requests.post('https://osu.ppy.sh/oauth/token', data=parameters)
-#print(request.content)
-#with open('token.json', 'w') as outfile:
-#    json.dump(r.json(), outfile)
-
 
 class OsuApiV2():
-    #async def __init__(self, client_id, client_secret):
-    #    while True:
-    #        tokenrequest = await self.refresh_token(client_id, client_secret)
-    #        self.token = tokenrequest['access_token']
-    #        time.sleep(tokenrequest['expires_in'] - 1000)
 
     token = OSU_API_TOKEN
     session = aiohttp.ClientSession()
@@ -111,12 +94,6 @@ class OsuApiV2():
 
 
 osuapi = OsuApiV2()
-#async def huinja():
-#    response = await osuapi.get_user(name=27267272, mode='osu', key='id')
-#    print(response)
-#    with open('osu_user.json', 'w') as outfile:
-#        await json.dump(response, outfile)
-
 
 
 intents = discord.Intents.default()
@@ -136,7 +113,6 @@ async def token_reset():
 async def on_ready():
     print(f'Logged in as {bot.user} (ID: {bot.user.id})')
     print('------')
-   # update_roles.start()
 
     print('Servers connected to:')
     for guild in bot.guilds:
@@ -144,10 +120,8 @@ async def on_ready():
 
     global lvguild
     lvguild = get(bot.guilds, id=SERVER_ID)
-    #await huinja()
 
     global pool
-    #pool = await asyncpg.create_pool('postgres://localhost', user='postgres', password='DAVISERGLIS')
     pool = await asyncpg.create_pool(DATABASE_URL, ssl='require')
 
     token_reset.start()
@@ -209,8 +183,6 @@ async def link_acc():
         async with pool.acquire() as db:
             for guild in bot.guilds:
                 for member in guild.members:
-                    #print(member.name)
-                    #print(member.activity)
                     if member.activities != None:
                         try:
                             for osu_activity in member.activities:
@@ -221,8 +193,6 @@ async def link_acc():
                                     result = await db.fetch(f'SELECT * FROM players WHERE discord_id = {member.id} AND osu_id IS NOT NULL')
 
                                     if result == []:
-                                        #print(member.activity.application_id)
-                                        #print(list(activity.assets.keys()))
 
                                         if osu_user['country_code'] == 'LV':
                                             result = await db.fetch(f'SELECT * FROM players WHERE osu_id = {osu_user["id"]};')
@@ -331,7 +301,6 @@ async def refresh_roles():
                     continue
                 
                 if new_role != current_role[0]:
-                    #user = await bot.fetch_user(row[0])
                     if rolesvalue[new_role] < rolesvalue[current_role[0]]:
                         #set role
                         await change_role(discord_id=row[0], current_role_id=roles[current_role[0]], new_role_id=roles[new_role])
