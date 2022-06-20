@@ -183,50 +183,6 @@ async def on_member_remove(member):
 
 
 
-@bot.command()
-async def test_query(ctx):
-    if ctx.channel.id != BOT_CHANNEL_ID:
-        return
-    async with aiosqlite.connect(db_file) as db:
-        async with db.execute(f'SELECT * FROM players WHERE osu_id IS NOT NULL;') as query:
-            rows = await query.fetchall()
-            for row in rows:
-                print(row)
-            
-
-@bot.command()
-async def test_get_ranking(ctx):
-    if ctx.channel.id != BOT_CHANNEL_ID:
-        return
-    cursor = ''
-    ranking = []
-    for i in range(2):
-            response = await osuapi.get_rankings(mode='osu', type='performance', country='LV', cursor=cursor)
-            cursor = response['cursor']['page']
-            ranking.extend(response['ranking'])
-            print(i)
-            print(response['ranking'][0]['pp'])
-    with open('json_data.json', 'w') as outfile:
-        json.dump(ranking, outfile)
-    await ctx.send("tested gettiung rwnajibn")
-
-@bot.command()
-async def test_get_singular_ranking_page(ctx):
-    if ctx.channel.id != BOT_CHANNEL_ID:
-        return
-    cursor = ''
-    response = await osuapi.get_rankings(mode='osu', type='performance', country='LV', cursor=cursor)
-    with open('json_data.json', 'w') as outfile:
-        json.dump(response, outfile)
-    await ctx.send('crazy')
-
-    
-@bot.command()
-async def test_get_restricted_user(ctx):
-    osu_user = await osuapi.get_user(name=9533316, mode='osu', key='id')
-    print(osu_user)
-
-
 async def change_role(discord_id, new_role_id, current_role_id=0):
     member = get(lvguild.members, id=discord_id)
     if current_role_id != 0:
@@ -248,10 +204,6 @@ async def send_rolechange_msg(case, discord_id, role=0):
         await channel.send(f'Spēlētājs {member.display_name} ir kļuvis neaktīvs!', allowed_mentions = discord.AllowedMentions(users = False))
 
 
-@bot.command()
-async def test_current_role(ctx, id_arg):
-    current_role = [rev_roles[role.id] for role in get(lvguild.members, id=int(id_arg)).roles if role.id in roles.values()]
-    await ctx.send(f'{get(lvguild.members, id=int(id_arg)).mention} role ir {current_role[0]}', allowed_mentions = discord.AllowedMentions(users = False))
 
 @tasks.loop(minutes=5)
 #@bot.command()
@@ -289,8 +241,9 @@ async def link_acc():
                                                 await ctx.send(f'Lietotājs {member.mention} spēlē uz osu! konta (id: {osu_user["id"]}), kas linkots ar <@{result[0][0]}>. Vecais konts unlinkots un linkots jaunais.')
 
                                         else:
-                                            await member.add_roles(get(lvguild.roles, id=539951111382237198))
-                                            await ctx.send(f'Lietotājs {member.mention} nav no Latvijas! (Pievienots imigranta role)')
+                                            if member.get_role(539951111382237198) == None:
+                                                await member.add_roles(get(lvguild.roles, id=539951111382237198))
+                                                await ctx.send(f'Lietotājs {member.mention} nav no Latvijas! (Pievienots imigranta role)')
 
                                     else:
                                         print(f"{member.mention} jau eksistē datubāzē")
@@ -301,31 +254,18 @@ async def link_acc():
                                             await ctx.send(f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]}. <@&963906948670046248>')
 
                         except AttributeError as ae:
-                            if str(ae) == "'CustomActivity' object has no attribute 'application_id'":
-                                print(ae)
-                                continue
-                            if str(ae) == "'Spotify' object has no attribute 'application_id'":
-                                print(ae)
-                                continue
-                            if str(ae) == "'Game' object has no attribute 'application_id'":
-                                print(ae)
-                                continue
-                            if str(ae) == "'Streaming' object has no attribute 'application_id'":
-                                print(ae)
+                            if str(ae) == "'CustomActivity' object has no attribute 'application_id'" or "'Spotify' object has no attribute 'application_id'" or "'Game' object has no attribute 'application_id'" or "'Streaming' object has no attribute 'application_id'":
                                 continue
                             else:
                                 raise ae
                         except KeyError as ke:
                             if str(ke) == "'large_image_text'":
-                                print(ke)
-                                print(member.display_name)
-                                print(member.id)
                                 continue
                             else:
                                 raise ke
 
                 
-        await ctx.send(f'Kontu savienošanas operācija pabeigta.')
+        print('link acc finished')
 
     except Exception as e:
         print(repr(e))
@@ -362,7 +302,6 @@ async def refresh_roles():
                 if country_rank == 99999:
                     osu_user = await osuapi.get_user(name=row[1], mode='osu', key='id')
                     if osu_user == {'error': None}:
-                        print(f'user <@{row[0]}> ir restricted')
                         #set restricted role
                         if current_role == []:
                             await change_role(discord_id = row[0], new_role_id=roles['restricted'])
@@ -374,7 +313,6 @@ async def refresh_roles():
                         
                         continue
                     if osu_user['statistics']['is_ranked'] == False:
-                        print(f'user {osu_user["username"]} is inactive')
                         #set inactive role
                         if current_role == []:
                             await change_role(discord_id = row[0], new_role_id=roles['inactive'])
@@ -389,7 +327,6 @@ async def refresh_roles():
                 
                 new_role = await get_role_with_rank(country_rank)
 
-                print(f'<@{row[0]}> pasreizejais role ir {current_role}')
                 if current_role == []:
                     print(f"linked cilvekam nav role serverī, vajadzetu but {new_role}")
                     #set role
@@ -409,44 +346,12 @@ async def refresh_roles():
                         await change_role(discord_id=row[0], current_role_id=roles[current_role[0]], new_role_id=roles[new_role])
                         await send_rolechange_msg(discord_id=row[0], case='nokritas', role=new_role)
                         continue
-                else:
-                    #user = await bot.fetch_user(row[0])
-                    print(f'Lietotājam {get(lvguild.members, id=row[0]).mention} jau ir pareizais role {current_role}.')
-            
-        await ctx.send(f'Roles refreshed.')
+
+        print("roles refreshed")
     except Exception as e:
         print(repr(e))
         await ctx.send(f'{repr(e)} in role refresh')
 
-
-@bot.command()
-async def test_mention(ctx):
-    if ctx.channel.id != BOT_CHANNEL_ID:
-        return
-    await ctx.send(f'{get(lvguild.members, id=240033379096068096).mention}')
-
-
-
-@bot.command()
-async def reset_db(ctx):
-    if ctx.channel.id != BOT_CHANNEL_ID:
-        return
-    print('called')
-    async with aiosqlite.connect(db_file) as db:
-        #guild = bot.get_guild(SERVER_ID)
-        await db.execute(f'DELETE FROM players')
-        for guild in bot.guilds:
-            for member in guild.members:
-              await db.execute(f'INSERT INTO players (discord_id) VALUES ({member.id});')
-            #adding existing roles into database (may not be needed)
-#            for role in member.roles:
-#                if role in roles.values:
-#            if any(role == roles.values for role in member.roles):
-#                db.execute(f'UPDATE users SET role_id = {role}')
-
-        await db.commit()
-    
-    await ctx.send(f'Database reset.')
 
 
 @bot.command()
@@ -470,35 +375,7 @@ async def update_user(ctx):
         if pievienots == False:
             await ctx.send(f'Nevienu nepievienoja datubāzei.')
 
-@bot.command()
-async def db_crosscheck(ctx):
-    if ctx.channel.id != BOT_CHANNEL_ID:
-        return
-    async with aiosqlite.connect(db_file) as pipa_db:
-        async with aiosqlite.connect('osulv_old_db.db') as lobster_db:
-            lobster_query = await lobster_db.execute('SELECT (discord_id), (osu_id) FROM useri;')
-            lobster_result = await lobster_query.fetchall()
-            pipa_query = await pipa_db.execute('SELECT * FROM players;')
-            pipa_result = await pipa_query.fetchall()
-            pipalist = [x[0] for x in pipa_result]
-            pipa_osu_list = [x[1] for x in pipa_result]
-            for row in lobster_result:
-                if int(row[0]) not in pipalist:
-                    print(f'<@{row[0]}> nav pipa datubaze')
-                if int(row[1]) not in pipa_osu_list:
-                    print(f'osu id {row[1]} nav pipa datubaze')
 
-@bot.command()
-async def create_tables(ctx):
-    if ctx.channel.id != BOT_CHANNEL_ID:
-        return
-    async with aiosqlite.connect(db_file) as db:
-        await db.execute("""CREATE TABLE IF NOT EXISTS players (
-                                    discord_id integer,
-                                    osu_id integer,
-                                );""")
-        await db.commit()
-        await ctx.send(f'Player table created.') 
 
 @bot.command()
 async def check(ctx, arg):
@@ -506,21 +383,6 @@ async def check(ctx, arg):
         return
     print(f'check')
     await ctx.send(arg)
-
-@bot.command()
-async def drop_column(ctx):
-    if ctx.channel.id != BOT_CHANNEL_ID:
-        return
-    async with aiosqlite.connect(db_file) as db:
-        await db.execute('ALTER TABLE players DROP COLUMN role;')
-        await db.commit()
-        await ctx.send('dropped role column')
-
-    
-@bot.command()
-async def crazy_func(ctx):
-    if ctx.channel.id == BOT_CHANNEL_ID:
-        await ctx.send(f'hello')
 
 @bot.command()
 async def desa(ctx):
@@ -532,47 +394,6 @@ async def pervert(ctx):
     print("added role")
 
 
-@bot.command()
-async def merge_db(ctx):
-    if ctx.channel.id != BOT_CHANNEL_ID:
-        return
-    async with aiosqlite.connect(db_file) as pipa_db:
-        async with aiosqlite.connect('osulv_old_db.db') as lobster_db:
-            lobster_query = await lobster_db.execute('SELECT (discord_id), (osu_id) FROM useri;')
-            lobster_result = await lobster_query.fetchall()
-            pipa_query = await pipa_db.execute('SELECT * FROM players;')
-            pipa_result = await pipa_query.fetchall()
-            discord_id_list = [x[0] for x in pipa_result]
-            for row in lobster_result:
-                if row[0] not in discord_id_list:
-                    await pipa_db.execute(f'INSERT INTO players (discord_id) VALUES ({row[0]});')
-                await pipa_db.execute(f'UPDATE players SET osu_id = {row[1]} WHERE discord_id = {row[0]};')
-        await pipa_db.commit()
-
-@bot.command()
-async def delete_gn(ctx):
-    async with aiosqlite.connect(db_file) as db:
-        await db.execute('DELETE FROM players WHERE discord_id = 1')
-        await db.commit()
-
-@bot.command()
-async def delete_duplicates(ctx):
-    async with aiosqlite.connect(db_file) as db:
-        query = await db.execute("""
-            DELETE FROM players
-            WHERE rowid > (
-              SELECT MIN(rowid) FROM players p2  
-              WHERE players.discord_id = p2.discord_id
-            );""")
-        result = await query.fetchall()
-        for row in result:
-            print(row)
-        await db.commit()
-
-@bot.command()
-async def test(ctx):
-    activities = get(lvguild.members, id=282548062700830720).activities
-    print(activities)
 
 @bot.command()
 async def purge_roles(ctx):
