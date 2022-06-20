@@ -200,11 +200,13 @@ async def link_acc():
                                             if result == []:
                                                 await db.execute(f'UPDATE players SET osu_id = {osu_user["id"]} WHERE discord_id = {member.id};')
                                                 await ctx.send(f'Pievienoja {member.mention} datubāzei ar osu! kontu {osu_user["username"]} (id: {osu_user["id"]})', allowed_mentions = discord.AllowedMentions(users = False))
+                                                await refresh_user_rank(member)
                                                 continue
                                             if member.id != result[0][0]:
                                                 await db.execute(f'UPDATE players SET osu_id = {osu_user["id"]} WHERE discord_id = {member.id};')
                                                 await db.execute(f'UPDATE players SET osu_id = NULL WHERE discord_id = {result[0][0]};')
                                                 await ctx.send(f'Lietotājs {member.mention} spēlē uz osu! konta (id: {osu_user["id"]}), kas linkots ar <@{result[0][0]}>. Vecais konts unlinkots un linkots jaunais.')
+                                                await refresh_user_rank(member)
 
                                         else:
                                             if member.get_role(539951111382237198) == None:
@@ -317,6 +319,19 @@ async def refresh_roles():
         print(repr(e))
         await ctx.send(f'{repr(e)} in role refresh')
 
+
+async def refresh_user_rank(member):
+    async with pool.acquire() as db: 
+        query = await db.fetch(f'SELECT * FROM players WHERE osu_id IS NOT NULL AND discord_id = {member.id};')
+        if query != []:
+            osu_user = await osuapi.get_user(name=query[0][1], mode='osu', key='id')
+            new_role = await get_role_with_rank(osu_user["rank"]["country"])
+            current_role = [role.id for role in member.roles if role.id in roles.values()]
+            if current_role != []:
+                await member.remove_roles(get(lvguild.roles, id=current_role))
+            await change_role(discord_id=member.id, new_role_id=roles[new_role])
+            await send_rolechange_msg(discord_id=member.id, case='no_previous_role', role=new_role)
+            print(f"refreshed rank for user {member.display_name}")
 
 
 @bot.command()
