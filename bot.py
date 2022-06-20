@@ -1,13 +1,10 @@
-import asyncio
 import os
 import asyncpg
 import discord
 from discord.ext import commands, tasks
 from discord.utils import get
 from dotenv import load_dotenv, set_key
-import aiosqlite
 import aiohttp
-import json
 
 
 load_dotenv()
@@ -17,7 +14,6 @@ API_CLIENT_SECRET = os.getenv('API_CLIENT_SECRET') #osu api client secret
 SERVER_ID = int(os.getenv('SERVER_ID'))
 OSU_API_TOKEN = os.getenv('OSU_API_TOKEN')
 BOT_CHANNEL_ID = int(os.getenv('BOT_CHANNEL_ID'))
-db_file = 'users.db'
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 
