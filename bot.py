@@ -105,7 +105,7 @@ bot = commands.Bot(intents=intents, command_prefix='!')
 #@bot.command()
 @tasks.loop(hours=12)
 async def token_reset():
-    ctx = get(lvguild.channels, id=BOT_CHANNEL_ID)
+    ctx = bot.get_channel(BOT_CHANNEL_ID)
     await osuapi.refresh_token(client_id=API_CLIENT_ID, client_secret=API_CLIENT_SECRET)
     await ctx.send('token reset')
 
@@ -119,7 +119,7 @@ async def on_ready():
         print(guild.name)
 
     global lvguild
-    lvguild = get(bot.guilds, id=SERVER_ID)
+    lvguild = bot.get_guild(SERVER_ID)
 
     global pool
     pool = await asyncpg.create_pool(DATABASE_URL, ssl='require')
@@ -132,11 +132,11 @@ async def on_ready():
 @bot.event
 async def on_member_join(member):
     guild = member.guild
-    channel = get(lvguild.channels, id=266580155860779009)
+    channel = bot.get_channel(266580155860779009)
     async with pool.acquire() as db:
         result = await db.fetch(f'SELECT * FROM players WHERE discord_id = {member.id};')
         if result == []:
-            await db.execute(f'INSERT INTO players (discord_id) VALUES ({member.id};')
+            await db.execute(f'INSERT INTO players (discord_id) VALUES ({member.id});')
             to_send = f'{member.mention} ir pievienojies {guild.name}!'
             await channel.send(to_send)
         else:
@@ -147,7 +147,7 @@ async def on_member_join(member):
 @bot.event
 async def on_member_remove(member):
     guild = member.guild
-    channel = get(lvguild.channels, id=266580155860779009)
+    channel = bot.get_channel(266580155860779009)
     to_send = f'{member.mention} ir izgājis no {guild.name}!'
     await channel.send(to_send)
 
@@ -159,27 +159,60 @@ async def change_role(discord_id, new_role_id, current_role_id=0):
         await member.remove_roles(get(lvguild.roles, id=current_role_id))
     await member.add_roles(get(lvguild.roles, id=new_role_id))
     
-async def send_rolechange_msg(case, discord_id, role=0):
-    channel = get(lvguild.channels, id=266580155860779009)
-    member = get(lvguild.members, id=discord_id)
-    if case == 'no_previous_role':
-        await channel.send(f'Spēlētājs {member.display_name} ir grupā {role}.', allowed_mentions = discord.AllowedMentions(users = False))
-    if case == 'pacelas':
-        await channel.send(f'Spēlētājs {member.display_name} pacēlās uz grupu {role}.', allowed_mentions = discord.AllowedMentions(users = False))
-    if case == 'nokritas':
-        await channel.send(f'Spēlētājs {member.display_name} nokrita uz grupu {role}.', allowed_mentions = discord.AllowedMentions(users = False))
-    if case == 'restricted':
-        await channel.send(f'Spēlētājs {member.display_name} kļuva restricted!', allowed_mentions = discord.AllowedMentions(users = False))
-    if case == 'inactive':
-        await channel.send(f'Spēlētājs {member.display_name} ir kļuvis neaktīvs!', allowed_mentions = discord.AllowedMentions(users = False))
+async def send_rolechange_msg(notikums, discord_id, role=0, osu_id=None, osu_user=None):
+    channel = bot.get_channel(266580155860779009)
 
+    member = get(lvguild.members, id=discord_id)
+    
+
+    match notikums:
+        case 'no_previous_role':
+            desc = f"ir grupā **{get(lvguild.roles, id=role).name}**!"
+            embed_color=0x14d121
+        case 'pacelas':
+            desc = f"pakāpās uz grupu **{get(lvguild.roles, id=role).name}**!"
+            embed_color=0x14d121
+        case 'nokritas':
+            desc = f"nokritās uz grupu **{get(lvguild.roles, id=role).name}**!"
+            embed_color=0xc41009
+        case 'restricted':
+            desc = "ir kļuvis restricted!"
+            embed_color=0x7b5c00
+            embed = discord.Embed(
+                    description=desc,
+                    color=embed_color)
+            embed.set_author(name=member.display_name, 
+                            icon_url=member.display_avatar.url)
+            await channel.send(embed=embed)
+            return
+
+        case 'inactive':
+            desc = "ir kļuvis inactive!"
+            embed_color=0x696969
+
+
+
+    embed = discord.Embed(
+            description=desc,
+            color=embed_color)
+
+    if osu_user == None:
+        osu_user = await osuapi.get_user(name=osu_id, mode='osu', key='id')
+
+    embed.set_author(name=osu_user['username'],
+    url=f"https://osu.ppy.sh/users/{osu_user['id']}",
+    icon_url=osu_user['avatar_url'])
+    
+    #embed.set_footer(text=member.display_name)
+
+    await channel.send(embed=embed)
 
 
 @tasks.loop(minutes=5)
 #@bot.command()
 async def link_acc():
     try:
-        ctx = get(lvguild.channels, id=BOT_CHANNEL_ID)
+        ctx = bot.get_channel(BOT_CHANNEL_ID)
         async with pool.acquire() as db:
             for guild in bot.guilds:
                 for member in guild.members:
@@ -243,7 +276,7 @@ async def link_acc():
 #@bot.command()
 async def refresh_roles():
     try:
-        ctx = get(lvguild.channels, id=BOT_CHANNEL_ID)
+        ctx = bot.get_channel(BOT_CHANNEL_ID)
         async with pool.acquire() as db:
             cursor = ''
             ranking = []
@@ -273,22 +306,22 @@ async def refresh_roles():
                         #set restricted role
                         if current_role == []:
                             await change_role(discord_id = row[0], new_role_id=roles['restricted'])
-                            await send_rolechange_msg(discord_id=row[0], case='restricted')
+                            await send_rolechange_msg(discord_id=row[0], notikums='restricted', osu_user=osu_user)
                             continue
                         if roles[current_role[0]] != roles['restricted']:
                             await change_role(discord_id = row[0], current_role_id=roles[current_role[0]], new_role_id=roles['restricted'])
-                            await send_rolechange_msg(discord_id=row[0], case='restricted')
+                            await send_rolechange_msg(discord_id=row[0], notikums='restricted', osu_user=osu_user)
                         
                         continue
                     if osu_user['statistics']['is_ranked'] == False:
                         #set inactive role
                         if current_role == []:
                             await change_role(discord_id = row[0], new_role_id=roles['inactive'])
-                            await send_rolechange_msg(discord_id=row[0], case='inactive')
+                            await send_rolechange_msg(discord_id=row[0], case='inactive', osu_user=osu_user)
                             continue
                         if roles[current_role[0]] != roles['inactive']:
                             await change_role(discord_id = row[0], current_role_id=roles[current_role[0]], new_role_id=roles['inactive'])
-                            await send_rolechange_msg(discord_id=row[0], case='inactive')
+                            await send_rolechange_msg(discord_id=row[0], case='inactive', osu_user=osu_user)
                         
                         continue
                 
@@ -299,19 +332,19 @@ async def refresh_roles():
                     print(f"linked cilvekam nav role serverī, vajadzetu but {new_role}")
                     #set role
                     await change_role(discord_id=row[0], new_role_id=roles[new_role])
-                    await send_rolechange_msg(discord_id=row[0], case='no_previous_role', role=new_role)
+                    await send_rolechange_msg(discord_id=row[0], case='no_previous_role', role=new_role, osu_id=row[1])
                     continue
                 
                 if new_role != current_role[0]:
                     if rolesvalue[new_role] < rolesvalue[current_role[0]]:
                         #set role
                         await change_role(discord_id=row[0], current_role_id=roles[current_role[0]], new_role_id=roles[new_role])
-                        await send_rolechange_msg(discord_id=row[0], case='pacelas', role=new_role)
+                        await send_rolechange_msg(discord_id=row[0], case='pacelas', role=new_role, osu_id=row[1])
                         continue
                     if rolesvalue[new_role] > rolesvalue[current_role[0]]:
                         #set role
                         await change_role(discord_id=row[0], current_role_id=roles[current_role[0]], new_role_id=roles[new_role])
-                        await send_rolechange_msg(discord_id=row[0], case='nokritas', role=new_role)
+                        await send_rolechange_msg(discord_id=row[0], case='nokritas', role=new_role, osu_id=row[1])
                         continue
 
         print("roles refreshed")
@@ -325,11 +358,12 @@ async def refresh_user_rank(member):
         query = await db.fetch(f'SELECT * FROM players WHERE osu_id IS NOT NULL AND discord_id = {member.id};')
         if query != []:
             osu_user = await osuapi.get_user(name=query[0][1], mode='osu', key='id')
-            new_role = await get_role_with_rank(osu_user["rank"]["country"])
+            new_role = await get_role_with_rank(osu_user["statistics"]["country_rank"])
             current_role = [role.id for role in member.roles if role.id in roles.values()]
-            if current_role != []:
-                await member.remove_roles(get(lvguild.roles, id=current_role))
-            await change_role(discord_id=member.id, new_role_id=roles[new_role])
+            if current_role == []:
+                await change_role(discord_id=member.id, new_role_id=roles[new_role])
+            else:
+                await change_role(discord_id=member.id, new_role_id=roles[new_role], current_role_id=current_role)
             await send_rolechange_msg(discord_id=member.id, case='no_previous_role', role=new_role)
             print(f"refreshed rank for user {member.display_name}")
 
