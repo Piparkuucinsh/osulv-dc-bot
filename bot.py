@@ -215,8 +215,8 @@ async def link_acc():
             for guild in bot.guilds:
                 for member in guild.members:
                     if member.activities != None:
-                        try:
-                            for osu_activity in member.activities:
+                        for osu_activity in member.activities:
+                            try:
                                 if osu_activity.application_id == 367827983903490050:         
                                     username = osu_activity.large_image_text.split('(', 1)[0].removesuffix(' ')
                                     if username == 'Guest':
@@ -258,16 +258,16 @@ async def link_acc():
                                         if osu_user['id'] != result[0][1]:
                                             await ctx.send(f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]}. <@&141542368972111872>')
 
-                        except AttributeError as ae:
-                            if str(ae) == "'CustomActivity' object has no attribute 'application_id'" or "'Spotify' object has no attribute 'application_id'" or "'Game' object has no attribute 'application_id'" or "'Streaming' object has no attribute 'application_id'":
-                                continue
-                            else:
-                                raise ae
-                        except KeyError as ke:
-                            if str(ke) == "'large_image_text'":
-                                continue
-                            else:
-                                raise ke
+                            except AttributeError as ae:
+                                if str(ae) == "'CustomActivity' object has no attribute 'application_id'" or "'Spotify' object has no attribute 'application_id'" or "'Game' object has no attribute 'application_id'" or "'Streaming' object has no attribute 'application_id'":
+                                    continue
+                                else:
+                                    raise ae
+                            except KeyError as ke:
+                                if str(ke) == "'large_image_text'":
+                                    continue
+                                else:
+                                    raise ke
 
                 
         print('link acc finished')
