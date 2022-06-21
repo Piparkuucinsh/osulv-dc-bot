@@ -167,13 +167,13 @@ async def send_rolechange_msg(notikums, discord_id, role=0, osu_id=None, osu_use
 
     match notikums:
         case 'no_previous_role':
-            desc = f"ir grupā **{get(lvguild.roles, id=roles(role)).name}**!"
+            desc = f"ir grupā **{get(lvguild.roles, id=roles[role]).name}**!"
             embed_color=0x14d121
         case 'pacelas':
-            desc = f"pakāpās uz grupu **{get(lvguild.roles, id=roles(role)).name}**!"
+            desc = f"pakāpās uz grupu **{get(lvguild.roles, id=roles[role]).name}**!"
             embed_color=0x14d121
         case 'nokritas':
-            desc = f"nokritās uz grupu **{get(lvguild.roles, id=roles(role)).name}**!"
+            desc = f"nokritās uz grupu **{get(lvguild.roles, id=roles[role]).name}**!"
             embed_color=0xc41009
         case 'restricted':
             desc = "ir kļuvis restricted!"
