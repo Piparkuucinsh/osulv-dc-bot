@@ -131,7 +131,6 @@ async def on_ready():
 
 @bot.event
 async def on_member_join(member):
-    guild = member.guild
     channel = bot.get_channel(266580155860779009)
     async with pool.acquire() as db:
         result = await db.fetch(f'SELECT * FROM players WHERE discord_id = {member.id};')
@@ -146,7 +145,6 @@ async def on_member_join(member):
 
 @bot.event
 async def on_member_remove(member):
-    guild = member.guild
     channel = bot.get_channel(266580155860779009)
     to_send = f'{member.mention} ir izgājis no servera!'
     await channel.send(to_send)
