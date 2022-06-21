@@ -137,10 +137,10 @@ async def on_member_join(member):
         result = await db.fetch(f'SELECT * FROM players WHERE discord_id = {member.id};')
         if result == []:
             await db.execute(f'INSERT INTO players (discord_id) VALUES ({member.id});')
-            to_send = f'{member.mention} ir pievienojies {guild.name}!'
+            to_send = f'{member.mention} ir pievienojies serverim!'
             await channel.send(to_send)
         else:
-            to_send = f'{member.mention} ir atkal pievienojies {guild.name}!'
+            to_send = f'{member.mention} ir atkal pievienojies serverim!'
             await channel.send(to_send)
     
 
@@ -167,13 +167,13 @@ async def send_rolechange_msg(notikums, discord_id, role=0, osu_id=None, osu_use
 
     match notikums:
         case 'no_previous_role':
-            desc = f"ir grupā **{get(lvguild.roles, id=role).name}**!"
+            desc = f"ir grupā **{get(lvguild.roles, id=roles(role)).name}**!"
             embed_color=0x14d121
         case 'pacelas':
-            desc = f"pakāpās uz grupu **{get(lvguild.roles, id=role).name}**!"
+            desc = f"pakāpās uz grupu **{get(lvguild.roles, id=roles(role)).name}**!"
             embed_color=0x14d121
         case 'nokritas':
-            desc = f"nokritās uz grupu **{get(lvguild.roles, id=role).name}**!"
+            desc = f"nokritās uz grupu **{get(lvguild.roles, id=roles(role)).name}**!"
             embed_color=0xc41009
         case 'restricted':
             desc = "ir kļuvis restricted!"
@@ -226,40 +226,39 @@ async def link_acc():
 
                                     osu_user = await osuapi.get_user(name=username, mode='osu', key='username')
 
-                                    try:
-                                        if osu_user['error'] == None:
-                                            continue
-                                    except:
-                                        result = await db.fetch(f'SELECT * FROM players WHERE discord_id = {member.id} AND osu_id IS NOT NULL')
+                                    if osu_user == {'error': None}:
+                                        continue
 
-                                        if result == []:
+                                    result = await db.fetch(f'SELECT * FROM players WHERE discord_id = {member.id} AND osu_id IS NOT NULL')
 
-                                            if osu_user['country_code'] == 'LV':
-                                                result = await db.fetch(f'SELECT * FROM players WHERE osu_id = {osu_user["id"]};')
-                                                #check if discord multiaccounter
-                                                if result == []:
-                                                    await db.execute(f'UPDATE players SET osu_id = {osu_user["id"]} WHERE discord_id = {member.id};')
-                                                    await ctx.send(f'Pievienoja {member.mention} datubāzei ar osu! kontu {osu_user["username"]} (id: {osu_user["id"]})', allowed_mentions = discord.AllowedMentions(users = False))
-                                                    await refresh_user_rank(member)
-                                                    continue
-                                                if member.id != result[0][0]:
-                                                    await db.execute(f'UPDATE players SET osu_id = {osu_user["id"]} WHERE discord_id = {member.id};')
-                                                    await db.execute(f'UPDATE players SET osu_id = NULL WHERE discord_id = {result[0][0]};')
-                                                    await ctx.send(f'Lietotājs {member.mention} spēlē uz osu! konta (id: {osu_user["id"]}), kas linkots ar <@{result[0][0]}>. Vecais konts unlinkots un linkots jaunais.')
-                                                    await refresh_user_rank(member)
+                                    if result == []:
 
-                                            else:
-                                                if member.get_role(539951111382237198) == None:
-                                                    await member.add_roles(get(lvguild.roles, id=539951111382237198))
-                                                    await ctx.send(f'Lietotājs {member.mention} nav no Latvijas! (Pievienots imigranta role)')
+                                        if osu_user['country_code'] == 'LV':
+                                            result = await db.fetch(f'SELECT * FROM players WHERE osu_id = {osu_user["id"]};')
+                                            #check if discord multiaccounter
+                                            if result == []:
+                                                await db.execute(f'UPDATE players SET osu_id = {osu_user["id"]} WHERE discord_id = {member.id};')
+                                                await ctx.send(f'Pievienoja {member.mention} datubāzei ar osu! kontu {osu_user["username"]} (id: {osu_user["id"]})', allowed_mentions = discord.AllowedMentions(users = False))
+                                                await refresh_user_rank(member)
+                                                continue
+                                            if member.id != result[0][0]:
+                                                await db.execute(f'UPDATE players SET osu_id = {osu_user["id"]} WHERE discord_id = {member.id};')
+                                                await db.execute(f'UPDATE players SET osu_id = NULL WHERE discord_id = {result[0][0]};')
+                                                await ctx.send(f'Lietotājs {member.mention} spēlē uz osu! konta (id: {osu_user["id"]}), kas linkots ar <@{result[0][0]}>. Vecais konts unlinkots un linkots jaunais.')
+                                                await refresh_user_rank(member)
 
                                         else:
-                                            print(f"{member.mention} jau eksistē datubāzē")
+                                            if member.get_role(539951111382237198) == None:
+                                                await member.add_roles(get(lvguild.roles, id=539951111382237198))
+                                                await ctx.send(f'Lietotājs {member.mention} nav no Latvijas! (Pievienots imigranta role)')
 
-                                            #check if osu multiaccount (datbase osu_id != activity osu_id)
-                                            print(result[0][1])
-                                            if osu_user['id'] != result[0][1]:
-                                                await ctx.send(f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]}. <@&141542368972111872>')
+                                    else:
+                                        print(f"{member.mention} jau eksistē datubāzē")
+
+                                        #check if osu multiaccount (datbase osu_id != activity osu_id)
+                                        print(result[0][1])
+                                        if osu_user['id'] != result[0][1]:
+                                            await ctx.send(f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]}. <@&141542368972111872>')
 
                         except AttributeError as ae:
                             if str(ae) == "'CustomActivity' object has no attribute 'application_id'" or "'Spotify' object has no attribute 'application_id'" or "'Game' object has no attribute 'application_id'" or "'Streaming' object has no attribute 'application_id'":
