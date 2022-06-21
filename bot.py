@@ -317,11 +317,11 @@ async def refresh_roles():
                         #set inactive role
                         if current_role == []:
                             await change_role(discord_id = row[0], new_role_id=roles['inactive'])
-                            await send_rolechange_msg(discord_id=row[0], case='inactive', osu_user=osu_user)
+                            await send_rolechange_msg(discord_id=row[0], notikums='inactive', osu_user=osu_user)
                             continue
                         if roles[current_role[0]] != roles['inactive']:
                             await change_role(discord_id = row[0], current_role_id=roles[current_role[0]], new_role_id=roles['inactive'])
-                            await send_rolechange_msg(discord_id=row[0], case='inactive', osu_user=osu_user)
+                            await send_rolechange_msg(discord_id=row[0], notikums='inactive', osu_user=osu_user)
                         
                         continue
                 
@@ -332,19 +332,19 @@ async def refresh_roles():
                     print(f"linked cilvekam nav role serverī, vajadzetu but {new_role}")
                     #set role
                     await change_role(discord_id=row[0], new_role_id=roles[new_role])
-                    await send_rolechange_msg(discord_id=row[0], case='no_previous_role', role=new_role, osu_id=row[1])
+                    await send_rolechange_msg(discord_id=row[0], notikums='no_previous_role', role=new_role, osu_id=row[1])
                     continue
                 
                 if new_role != current_role[0]:
                     if rolesvalue[new_role] < rolesvalue[current_role[0]]:
                         #set role
                         await change_role(discord_id=row[0], current_role_id=roles[current_role[0]], new_role_id=roles[new_role])
-                        await send_rolechange_msg(discord_id=row[0], case='pacelas', role=new_role, osu_id=row[1])
+                        await send_rolechange_msg(discord_id=row[0], notikums='pacelas', role=new_role, osu_id=row[1])
                         continue
                     if rolesvalue[new_role] > rolesvalue[current_role[0]]:
                         #set role
                         await change_role(discord_id=row[0], current_role_id=roles[current_role[0]], new_role_id=roles[new_role])
-                        await send_rolechange_msg(discord_id=row[0], case='nokritas', role=new_role, osu_id=row[1])
+                        await send_rolechange_msg(discord_id=row[0], notikums='nokritas', role=new_role, osu_id=row[1])
                         continue
 
         print("roles refreshed")
@@ -364,7 +364,7 @@ async def refresh_user_rank(member):
                 await change_role(discord_id=member.id, new_role_id=roles[new_role])
             else:
                 await change_role(discord_id=member.id, new_role_id=roles[new_role], current_role_id=current_role)
-            await send_rolechange_msg(discord_id=member.id, case='no_previous_role', role=new_role)
+            await send_rolechange_msg(discord_id=member.id, notikums='no_previous_role', role=new_role)
             print(f"refreshed rank for user {member.display_name}")
 
 
