@@ -83,8 +83,8 @@ class OsuApiV2():
 
 
     async def get_user(self, name, mode, key):
-            async with self.session.get(f'https://osu.ppy.sh/api/v2/users/{name}/{mode}', params={'key':key}, headers={'Authorization':f'Bearer {self.token}'}) as response:
-                return await response.json()
+        async with self.session.get(f'https://osu.ppy.sh/api/v2/users/{name}/{mode}', params={'key':key}, headers={'Authorization':f'Bearer {self.token}'}) as response:
+            return await response.json()
 
     async def get_rankings(self, mode, type, country, cursor):
         async with self.session.get(f'https://osu.ppy.sh/api/v2/rankings/{mode}/{type}', params={'country':country, 'page':cursor}, headers={'Authorization':f'Bearer {self.token}'}) as response:
@@ -368,7 +368,7 @@ async def refresh_user_rank(member):
                 await change_role(discord_id=member.id, new_role_id=roles[new_role])
             else:
                 await change_role(discord_id=member.id, new_role_id=roles[new_role], current_role_id=current_role)
-            await send_rolechange_msg(discord_id=member.id, notikums='no_previous_role', role=new_role)
+            await send_rolechange_msg(discord_id=member.id, notikums='no_previous_role', role=new_role, osu_user=osu_user)
             print(f"refreshed rank for user {member.display_name}")
 
 
