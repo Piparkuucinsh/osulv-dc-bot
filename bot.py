@@ -223,8 +223,11 @@ async def link_acc():
                                     username = osu_activity.large_image_text.split('(', 1)[0].removesuffix(' ')
                                     if username == 'Guest':
                                         continue
-                                    
+
                                     osu_user = await osuapi.get_user(name=username, mode='osu', key='username')
+
+                                    if osu_user['error'] == None:
+                                        continue
 
                                     result = await db.fetch(f'SELECT * FROM players WHERE discord_id = {member.id} AND osu_id IS NOT NULL')
 
