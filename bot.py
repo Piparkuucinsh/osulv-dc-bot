@@ -148,7 +148,7 @@ async def on_member_join(member):
 async def on_member_remove(member):
     guild = member.guild
     channel = bot.get_channel(266580155860779009)
-    to_send = f'{member.mention} ir izgājis no {guild.name}!'
+    to_send = f'{member.mention} ir izgājis no servera!'
     await channel.send(to_send)
 
 
