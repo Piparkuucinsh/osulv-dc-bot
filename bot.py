@@ -146,7 +146,7 @@ async def on_member_join(member):
 @bot.event
 async def on_member_remove(member):
     channel = bot.get_channel(266580155860779009)
-    to_send = f'{member.mention} ir izgājis no servera!'
+    to_send = f'**{member.display_name}** ir izgājis no servera!'
     await channel.send(to_send)
 
 
@@ -219,7 +219,7 @@ async def link_acc():
                             try:
                                 if osu_activity.application_id == 367827983903490050:         
                                     username = osu_activity.large_image_text.split('(', 1)[0].removesuffix(' ')
-                                    if username == 'Guest':
+                                    if username == osu_activity.large_image_text:
                                         continue
 
                                     osu_user = await osuapi.get_user(name=username, mode='osu', key='username')
