@@ -261,10 +261,10 @@ async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
     )
     [calc_result] = pp_calc.calculate(calc_params)
     
-    time_text = str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:') if calc_result.clockRate == 1 else f"{str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:')} ({str(timedelta(seconds=score['beatmap']['total_length']/calc_result.clockRate)).removeprefix('0:')})"
+    time_text = str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:') if calc_result.clockRate == 1 else f"{str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:')} ({str(timedelta(seconds=round(score['beatmap']['total_length']/calc_result.clockRate))).removeprefix('0:')})"
     bpm_text = f'{score["beatmap"]["bpm"]} BPM' if isclose(score["beatmap"]["bpm"], calc_result.bpm) else f'{score["beatmap"]["bpm"]} -> **{round(calc_result.bpm)} BPM**'
     if score['mods'] != []:
-        mod_text = '+'
+        mod_text = '\t+'
         for mod in score['mods']:
             mod_text += mod
     else:
@@ -298,7 +298,7 @@ async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
     #embed.set_footer(text=f'Limit: {limit}')
 
     embed.add_field(
-        name = f'** {rank_emoji[score["rank"]]}\t{mod_text}\t{score["score"]:,}\t({round(score["accuracy"], 4):.2%}) **',
+        name = f'** {rank_emoji[score["rank"]]}{mod_text}\t{score["score"]:,}\t({round(score["accuracy"], 4):.2%}) **',
         value = f'''**{round(score["pp"], 2)}**/{round(calc_result.pp, 2)}pp [ **{score["max_combo"]}x**/{calc_result.maxCombo}x ] {{{score["statistics"]["count_300"]}/{score["statistics"]["count_100"]}/{score["statistics"]["count_50"]}/{score["statistics"]["count_miss"]}}}
         {time_text} | {bpm_text}
         <t:{int(scoretime.timestamp())}:R> | Limit: {limit}'''
