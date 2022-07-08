@@ -202,7 +202,6 @@ async def user_newbest_loop():
 
             if row[2] == None:
                 last_checked = datetime.now(tz=timezone.utc) - timedelta(minutes=60)
-                await db.execute(f"UPDATE players SET last_checked = '{last_checked.replace(microsecond=0).isoformat()}' WHERE discord_id = {row[0]}")
             else:
                 last_checked = parser.parse(row[2])
             
@@ -210,9 +209,10 @@ async def user_newbest_loop():
 
             await get_user_newbest(osu_id=row[1], limit=limit, last_checked=last_checked)
 
-            print('completed 1 cycle')
+            await db.execute(f"UPDATE players SET last_checked = '{datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat()}' WHERE discord_id = {row[0]}")
+
             time.sleep(0.1)
-            print('slept 5s')
+
             
                 
 
@@ -251,7 +251,7 @@ async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
     [calc_result] = pp_calc.calculate(calc_params)
     
     time_text = str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:') if calc_result.clockRate == 1 else f"{str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:')} ({str(timedelta(seconds=score['beatmap']['total_length']/calc_result.clockRate)).removeprefix('0:')})"
-    bpm_text = f'{score["beatmap"]["bpm"]} BPM' if isclose(score["beatmap"]["bpm"], calc_result.bpm) else f'{score["beatmap"]["bpm"]} -> **{round(calc_result.bpm, 0)} BPM**'
+    bpm_text = f'{score["beatmap"]["bpm"]} BPM' if isclose(score["beatmap"]["bpm"], calc_result.bpm) else f'{score["beatmap"]["bpm"]} -> **{round(calc_result.bpm)} BPM**'
     if score['mods'] != []:
         mod_text = '+'
         for mod in score['mods']:
