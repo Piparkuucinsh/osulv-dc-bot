@@ -6,7 +6,11 @@ from discord.utils import get
 from dotenv import load_dotenv, set_key
 import aiohttp
 import asyncio
-
+from dateutil import parser
+from datetime import datetime, timedelta, timezone
+from rosu_pp_py import Calculator, ScoreParams
+from math import isclose
+import time
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
@@ -61,7 +65,42 @@ async def get_role_with_rank(rank):
         case rank if rank > 1000:
             return 'LVinf'
 
+mods_dict = {
+    'NF': 1,
+    'EZ': 2,
+    'TD': 4,
+    'HD': 8,
+    'HR': 16,
+    'SD': 32,
+    'DT': 64,
+    'RL': 128,
+    'HT': 256,
+    'NC': 576, # 512, Only set along with DoubleTime. i.e: NC only gives 576
+    'FL': 1024,
+    'AT': 2048,
+    'SO': 4096,
+    'AP': 8192,    # Autopilot
+    'PF': 16416, #16384, Only set along with SuddenDeath. i.e: PF only gives 16416  
+}
 
+async def mods_int_from_list(mods):
+    modint = 0
+    for mod in mods:
+        modint += mods_dict[mod]
+    return modint
+
+user_newbest_limit = {
+    'LV1': 100,
+    'LV5': 80,
+    'LV10': 60,
+    'LV25': 50,
+    'LV50': 30,
+    'LV100': 20,
+    'LV250': 15,
+    'LV500': 10,
+    'LV1000': 5,
+    'LVinf': 1,
+}
 
 class OsuApiV2():
 
@@ -90,6 +129,17 @@ class OsuApiV2():
         async with self.session.get(f'https://osu.ppy.sh/api/v2/rankings/{mode}/{type}', params={'country':country, 'page':cursor}, headers={'Authorization':f'Bearer {self.token}'}) as response:
             return await response.json()
 
+    async def get_scores(self, mode, osu_id, type, limit):
+        async with self.session.get(f'https://osu.ppy.sh/api/v2/users/{osu_id}/scores/{type}', params={'mode': mode, 'limit': limit}, headers={'Authorization':f'Bearer {self.token}'}) as response:
+            return await response.json()
+
+    async def get_user_recent(self, osu_id):
+        async with self.session.get(f'https://osu.ppy.sh/api/v2/users/{osu_id}/recent_activity', headers={'Authorization':f'Bearer {self.token}'}) as response:
+            return await response.json()
+
+    async def get_beatmap_score(self, mode, osu_id, beatmap_id, mods=''):
+        async with self.session.get(f'https://osu.ppy.sh/api/v2/beatmaps/{beatmap_id}/scores/users/{osu_id}', params={'mode': mode, 'mods': mods}, headers={'Authorization':f'Bearer {self.token}'}) as response:
+            return await response.json()
     
 
 
@@ -107,7 +157,7 @@ bot = commands.Bot(intents=intents, command_prefix='!')
 async def token_reset():
     ctx = bot.get_channel(BOT_CHANNEL_ID)
     await osuapi.refresh_token(client_id=API_CLIENT_ID, client_secret=API_CLIENT_SECRET)
-    await ctx.send('token reset')
+    print('token reset')
 
 @bot.event
 async def on_ready():
@@ -129,11 +179,134 @@ async def on_ready():
     link_acc.start()
     refresh_roles.start()
 
+
+@bot.command()
+async def start_userbest(ctx):
+    try:
+        await user_newbest_loop()
+    except:
+        print('xd')
+
+async def user_newbest_loop():
+    async with pool.acquire() as db:
+        result = await db.fetch(f'SELECT * FROM players WHERE osu_id IS NOT NULL;')
+        member_id_list = [x.id for x in lvguild.members]
+
+        for row in result:
+            if row[0] not in member_id_list:
+                continue
+
+            [current_role] = [rev_roles[role.id] for role in get(lvguild.members, id=row[0]).roles if role.id in roles.values()]
+            if rolesvalue[current_role] > 9:
+                continue
+
+            if row[2] == None:
+                last_checked = datetime.now(tz=timezone.utc) - timedelta(minutes=60)
+                await db.execute(f"UPDATE players SET last_checked = '{last_checked.replace(microsecond=0).isoformat()}' WHERE discord_id = {row[0]}")
+            else:
+                last_checked = parser.parse(row[2])
+            
+            limit = user_newbest_limit[current_role]
+
+            await get_user_newbest(osu_id=row[1], limit=limit, last_checked=last_checked)
+
+            print('completed 1 cycle')
+            time.sleep(0.1)
+            print('slept 5s')
+            
+                
+
+
+
+async def get_user_newbest(osu_id, limit, last_checked):
+    user_scores = await osuapi.get_scores(osu_id=osu_id, type='best', mode='osu', limit=limit)
+    for index, score in enumerate(user_scores, start=1):
+        score_time = parser.parse(score['created_at'])
+        osu_user = None
+        if score_time > last_checked:
+            if osu_user == None:
+                osu_user = await osuapi.get_user(name=osu_id, mode='osu', key='id')
+            await post_user_newbest(score=score, limit=limit, scoretime=score_time, score_rank=index, osu_user=osu_user)
+
+
+async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
+    channel = bot.get_channel(266580155860779009)
+    embed_color=0x0084FF
+
+    beatmap_id = score["beatmap"]["id"]
+    if os.path.exists(f'{beatmap_id}.osu') == False:
+        async with aiohttp.ClientSession() as s:
+            url = f'https://osu.ppy.sh/osu/{beatmap_id}'
+            async with s.get(url) as resp:
+                if resp.status == 200:
+                    with open(f'{beatmap_id}.osu', mode='wb') as f:
+                        f.write(await resp.read())
+
+
+    pp_calc = Calculator(f'{beatmap_id}.osu')
+    
+    calc_params = ScoreParams(
+        mods = await mods_int_from_list(score['mods'])
+    )
+    [calc_result] = pp_calc.calculate(calc_params)
+    
+    time_text = str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:') if calc_result.clockRate == 1 else f"{str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:')} ({str(timedelta(seconds=score['beatmap']['total_length']/calc_result.clockRate)).removeprefix('0:')})"
+    bpm_text = f'{score["beatmap"]["bpm"]} BPM' if isclose(score["beatmap"]["bpm"], calc_result.bpm) else f'{score["beatmap"]["bpm"]} -> **{round(calc_result.bpm, 0)} BPM**'
+    if score['mods'] != []:
+        mod_text = '+'
+        for mod in score['mods']:
+            mod_text += mod
+    else:
+        mod_text = ''
+
+
+#    desc=f'''__**{score["pp"]:.2f}**/{calc_result.pp:.2f}pp **| #{score_rank}** personal best **|** Max:{limit}__
+##{osu_user["statistics"]["global_rank"]} **|** #{osu_user["statistics"]["country_rank"]} {score["user"]["country_code"]} **|** {osu_user["statistics"]["pp"]:.2f}pp
+#x{score["max_combo"]}/{calc_result.maxCombo} **|** {score["rank"]} **|** {score["score"]} **|** {score["accuracy"]:.2%} **|** +{mod_text}
+#[{score["beatmapset"]["artist"]} - {score["beatmapset"]["title"]} [{score["beatmap"]["version"]}]]({score["beatmap"]["url"]})
+#{time_text} **|** {bpm_text} **|** ★**{calc_result.stars:.2f}**\n <t:{int(scoretime.timestamp())}:R>'''
+
+    #desc = f'''**[{score["beatmapset"]["artist"]} - {score["beatmapset"]["title"]} [{score["beatmap"]["version"]}] [{round(calc_result.stars, 2)}]](https://osu.ppy.sh/b/{score["beatmap"]["id"]})
+    #__Personal Best #{score_rank}__**'''
+
+    desc = f'**__Personal Best #{score_rank}__**'
+
+    embed = discord.Embed(
+            description=desc,
+            color=embed_color
+            )
+
+    embed.set_author(
+        name=f'{score["user"]["username"]}: {round(osu_user["statistics"]["pp"], 2):,}pp (#{osu_user["statistics"]["global_rank"]:,} {score["user"]["country_code"]}{osu_user["statistics"]["country_rank"]})',
+        url=f'https://osu.ppy.sh/users/{score["user"]["id"]}',
+        icon_url=score["user"]["avatar_url"]
+    )
+    embed.set_thumbnail(url=score['beatmapset']['covers']['list'])
+    embed.url = f'https://osu.ppy.sh/b/{score["beatmap"]["id"]}'
+    embed.title = f'{score["beatmapset"]["artist"]} - {score["beatmapset"]["title"]} [{score["beatmap"]["version"]}] [{round(calc_result.stars, 2)}]'
+    #embed.set_footer(text=f'Limit: {limit}')
+
+    embed.add_field(
+        name = f'** {score["rank"]}\t{mod_text}\t{score["score"]:,}\t({round(score["accuracy"], 4):.2%}) **',
+        value = f'''**{round(score["pp"], 2)}**/{round(calc_result.pp, 2)}pp [ **{score["max_combo"]}x**/{calc_result.maxCombo}x ] {{{score["statistics"]["count_300"]}/{score["statistics"]["count_100"]}/{score["statistics"]["count_50"]}/{score["statistics"]["count_miss"]}}}
+        {time_text} | {bpm_text}
+        <t:{int(scoretime.timestamp())}:R> | Limit: {limit}'''
+
+    )
+    #embed.add_field(
+    #    name= '\u200b',
+    #    value=f'<t:{int(scoretime.timestamp())}:R> | Limit: {limit}',
+    #    inline=False
+    #)
+
+    await channel.send(embed=embed)
+   
+
 @bot.event
 async def on_member_join(member):
     channel = bot.get_channel(266580155860779009)
     async with pool.acquire() as db:
-        result = await db.fetch(f'SELECT * FROM players WHERE discord_id = {member.id};')
+        result = await db.fetch(f'SELECT discord_id FROM players WHERE discord_id = {member.id};')
         if result == []:
             await db.execute(f'INSERT INTO players (discord_id) VALUES ({member.id});')
             to_send = f'{member.mention} ir pievienojies serverim!'
@@ -187,6 +360,9 @@ async def send_rolechange_msg(notikums, discord_id, role=0, osu_id=None, osu_use
         case 'inactive':
             desc = "ir kļuvis inactive!"
             embed_color=0x696969
+        case 'unrestricted':
+            desc = "ir kļuvis unrestrictots!"
+            embed_color=0x14d121
 
 
 
@@ -227,12 +403,12 @@ async def link_acc():
                                     if osu_user == {'error': None}:
                                         continue
 
-                                    result = await db.fetch(f'SELECT * FROM players WHERE discord_id = {member.id} AND osu_id IS NOT NULL')
+                                    result = await db.fetch(f'SELECT discord_id, osu_id FROM players WHERE discord_id = {member.id} AND osu_id IS NOT NULL')
 
                                     if result == []:
 
                                         if osu_user['country_code'] == 'LV':
-                                            result = await db.fetch(f'SELECT * FROM players WHERE osu_id = {osu_user["id"]};')
+                                            result = await db.fetch(f'SELECT discord_id, osu_id FROM players WHERE osu_id = {osu_user["id"]};')
                                             #check if discord multiaccounter
                                             if result == []:
                                                 await db.execute(f'UPDATE players SET osu_id = {osu_user["id"]} WHERE discord_id = {member.id};')
@@ -256,7 +432,7 @@ async def link_acc():
                                         #check if osu multiaccount (datbase osu_id != activity osu_id)
                                         print(result[0][1])
                                         if osu_user['id'] != result[0][1]:
-                                            await ctx.send(f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]}. <@&141542368972111872>')
+                                            await ctx.send(f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]}.')
 
                             except AttributeError as ae:
                                 if str(ae) == "'CustomActivity' object has no attribute 'application_id'" or "'Spotify' object has no attribute 'application_id'" or "'Game' object has no attribute 'application_id'" or "'Streaming' object has no attribute 'application_id'":
@@ -291,7 +467,7 @@ async def refresh_roles():
 
             ranking_id_list = [x['user']['id'] for x in ranking]
 
-            result = await db.fetch(f'SELECT * FROM players WHERE osu_id IS NOT NULL;')
+            result = await db.fetch(f'SELECT discord_id, osu_id FROM players WHERE osu_id IS NOT NULL;')
             member_id_list = [x.id for x in lvguild.members]
 
             for row in result:
@@ -337,9 +513,12 @@ async def refresh_roles():
                     #set role
                     await change_role(discord_id=row[0], new_role_id=roles[new_role])
                     await send_rolechange_msg(discord_id=row[0], notikums='no_previous_role', role=new_role, osu_id=row[1])
-                    continue
-                
-                if new_role != current_role[0]:
+
+                elif current_role[0] == 'restricted':
+                    await change_role(discord_id=row[0], current_role_id=roles[current_role[0]], new_role_id=roles[new_role])
+                    await send_rolechange_msg(discord_id=row[0], notikums='unrestricted', role=new_role, osu_id=row[1])
+               
+                elif new_role != current_role[0]:
                     if rolesvalue[new_role] < rolesvalue[current_role[0]]:
                         #set role
                         await change_role(discord_id=row[0], current_role_id=roles[current_role[0]], new_role_id=roles[new_role])
@@ -359,7 +538,7 @@ async def refresh_roles():
 
 async def refresh_user_rank(member):
     async with pool.acquire() as db: 
-        query = await db.fetch(f'SELECT * FROM players WHERE osu_id IS NOT NULL AND discord_id = {member.id};')
+        query = await db.fetch(f'SELECT discord_id, osu_id FROM players WHERE osu_id IS NOT NULL AND discord_id = {member.id};')
         if query != []:
             osu_user = await osuapi.get_user(name=query[0][1], mode='osu', key='id')
             new_role = await get_role_with_rank(osu_user["statistics"]["country_rank"])
