@@ -35,7 +35,7 @@ roles = {
     'LV1000': 915647090581966858,
     'LVinf': 915647192755212289,
     'restricted': 348195423841943564,
-    'inactive': 964604143912255509,
+    'inactive': 964604143912255509
 }
 
 rev_roles = dict((v,k) for k,v in roles.items())
@@ -80,7 +80,18 @@ mods_dict = {
     'AT': 2048,
     'SO': 4096,
     'AP': 8192,    # Autopilot
-    'PF': 16416, #16384, Only set along with SuddenDeath. i.e: PF only gives 16416  
+    'PF': 16416 #16384, Only set along with SuddenDeath. i.e: PF only gives 16416  
+}
+
+rank_emoji = {
+    'SSH': '<:SSplus:995050710406283354>',
+    'SS': '<:SS:995050712784453747>',
+    'SH': '<:Splus:995050705926762517>',
+    'S': '<:S_:995050707835166761>',
+    'A': '<:A_:995050698221813770>',
+    'B': '<:B_:995050700147015761>',
+    'C': '<:C_:995050701879267378>',
+    'D': '<:D_:995050703372439633>'
 }
 
 async def mods_int_from_list(mods):
@@ -283,11 +294,11 @@ async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
     )
     embed.set_thumbnail(url=score['beatmapset']['covers']['list'])
     embed.url = f'https://osu.ppy.sh/b/{score["beatmap"]["id"]}'
-    embed.title = f'{score["beatmapset"]["artist"]} - {score["beatmapset"]["title"]} [{score["beatmap"]["version"]}] [{round(calc_result.stars, 2)}]'
+    embed.title = f'{score["beatmapset"]["artist"]} - {score["beatmapset"]["title"]} [{score["beatmap"]["version"]}] [{round(calc_result.stars, 2)}★]'
     #embed.set_footer(text=f'Limit: {limit}')
 
     embed.add_field(
-        name = f'** {score["rank"]}\t{mod_text}\t{score["score"]:,}\t({round(score["accuracy"], 4):.2%}) **',
+        name = f'** {rank_emoji[score["rank"]]}\t{mod_text}\t{score["score"]:,}\t({round(score["accuracy"], 4):.2%}) **',
         value = f'''**{round(score["pp"], 2)}**/{round(calc_result.pp, 2)}pp [ **{score["max_combo"]}x**/{calc_result.maxCombo}x ] {{{score["statistics"]["count_300"]}/{score["statistics"]["count_100"]}/{score["statistics"]["count_50"]}/{score["statistics"]["count_miss"]}}}
         {time_text} | {bpm_text}
         <t:{int(scoretime.timestamp())}:R> | Limit: {limit}'''
