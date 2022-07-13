@@ -195,8 +195,9 @@ async def on_ready():
 async def start_userbest(ctx):
     try:
         await user_newbest_loop()
-    except:
-        print('xd')
+    except Exception as e:
+        print(repr(e))
+        await ctx.send(f'{repr(e)} in userbest')
 
 async def user_newbest_loop():
     async with pool.acquire() as db:
