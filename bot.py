@@ -263,7 +263,7 @@ async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
     [calc_result] = pp_calc.calculate(calc_params)
     
     time_text = str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:') if calc_result.clockRate == 1 else f"{str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:')} ({str(timedelta(seconds=round(score['beatmap']['total_length']/calc_result.clockRate))).removeprefix('0:')})"
-    bpm_text = f'{score["beatmap"]["bpm"]} BPM' if isclose(score["beatmap"]["bpm"], calc_result.bpm) else f'{score["beatmap"]["bpm"]} -> **{round(calc_result.bpm)} BPM**'
+    bpm_text = f'{score["beatmap"]["bpm"]} BPM' if calc_result.clockRate == 1 else f'{score["beatmap"]["bpm"]} -> **{round(int(score["beatmap"]["bpm"])*calc_result.clockRate)} BPM**'
     if score['mods'] != []:
         mod_text = '\t+'
         for mod in score['mods']:
