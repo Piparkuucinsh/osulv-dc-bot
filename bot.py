@@ -393,6 +393,7 @@ async def send_rolechange_msg(notikums, discord_id, role=0, osu_id=None, osu_use
 
     await channel.send(embed=embed)
 
+already_sent_messages = []
 
 @tasks.loop(minutes=5)
 #@bot.command()
@@ -444,7 +445,11 @@ async def link_acc():
                                         #check if osu multiaccount (datbase osu_id != activity osu_id)
                                         print(result[0][1])
                                         if osu_user['id'] != result[0][1]:
-                                            await ctx.send(f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]}.')
+                                            if (osu_user['id'], result[0][1]) not in already_sent_messages:
+                                                await ctx.send(f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]}.')
+                                                already_sent_messages.append((osu_user['id'], result[0][1]))
+                                            else:
+                                                continue
 
                             except AttributeError as ae:
                                 if str(ae) == "'CustomActivity' object has no attribute 'application_id'" or "'Spotify' object has no attribute 'application_id'" or "'Game' object has no attribute 'application_id'" or "'Streaming' object has no attribute 'application_id'":
