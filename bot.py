@@ -189,6 +189,7 @@ async def on_ready():
     await asyncio.sleep(5)
     link_acc.start()
     refresh_roles.start()
+    user_newbest_loop.start()
 
 
 @bot.command()
@@ -199,6 +200,7 @@ async def start_userbest(ctx):
         print(repr(e))
         await ctx.send(f'{repr(e)} in userbest')
 
+@tasks.loop(minutes=60)
 async def user_newbest_loop():
     async with pool.acquire() as db:
         result = await db.fetch(f'SELECT * FROM players WHERE osu_id IS NOT NULL;')
@@ -334,7 +336,11 @@ async def on_member_remove(member):
     to_send = f'**{member.display_name}** ir izgājis no servera!'
     await channel.send(to_send)
 
-
+@bot.event
+async def on_member_ban(guild, member):
+    channel = bot.get_channel(266580155860779009)
+    to_send = f'**{member.display_name}** ir ticis nobanots no servera!'
+    await channel.send(to_send)
 
 async def change_role(discord_id, new_role_id, current_role_id=0):
     member = get(lvguild.members, id=discord_id)
