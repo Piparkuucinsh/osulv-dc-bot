@@ -185,11 +185,11 @@ async def on_ready():
     global pool
     pool = await asyncpg.create_pool(DATABASE_URL, ssl='require')
 
-    #token_reset.start()
-    #await asyncio.sleep(5)
-    #link_acc.start()
-    #refresh_roles.start()
-    #user_newbest_loop.start()
+    token_reset.start()
+    await asyncio.sleep(5)
+    link_acc.start()
+    refresh_roles.start()
+    user_newbest_loop.start()
 
 
 @bot.command()
