@@ -185,11 +185,11 @@ async def on_ready():
     global pool
     pool = await asyncpg.create_pool(DATABASE_URL, ssl='require')
 
-    token_reset.start()
-    await asyncio.sleep(5)
-    link_acc.start()
-    refresh_roles.start()
-    user_newbest_loop.start()
+    #token_reset.start()
+    #await asyncio.sleep(5)
+    #link_acc.start()
+    #refresh_roles.start()
+    #user_newbest_loop.start()
 
 
 @bot.command()
@@ -229,7 +229,13 @@ async def user_newbest_loop():
 
             
                 
+@bot.command()
+async def delete(ctx):
+    channel = bot.get_channel(266580155860779009)
 
+    async for message in channel.history(limit=20):
+        if message.author.id==442370931772358666:
+            await message.delete()
 
 
 async def get_user_newbest(osu_id, limit, last_checked):
@@ -507,6 +513,9 @@ async def refresh_roles():
                     osu_user = await osuapi.get_user(name=row[1], mode='osu', key='id')
                     if osu_user == {'error': None}:
                         #set restricted role
+                        osu_api_check = await osuapi.get_user(name=2, mode='osu', key='id')
+                        if osu_api_check == {'error': None}:
+                            continue
                         if current_role == []:
                             await change_role(discord_id = row[0], new_role_id=roles['restricted'])
                             await send_rolechange_msg(discord_id=row[0], notikums='restricted', osu_user=osu_user)
