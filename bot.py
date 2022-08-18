@@ -464,7 +464,7 @@ async def link_acc():
                                         print(result[0][1])
                                         if osu_user['id'] != result[0][1]:
                                             if (osu_user['id'], result[0][1]) not in already_sent_messages:
-                                                await ctx.send(f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]}.')
+                                                #await ctx.send(f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]}.')
                                                 already_sent_messages.append((osu_user['id'], result[0][1]))
                                             else:
                                                 continue
