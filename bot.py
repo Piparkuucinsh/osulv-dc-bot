@@ -348,6 +348,12 @@ async def on_member_ban(guild, member):
     to_send = f'**{member.display_name}** ir ticis nobanots no servera!'
     await channel.send(to_send)
 
+@bot.event
+async def on_member_unban(guild, member):
+    channel = bot.get_channel(266580155860779009)
+    to_send = f'**{member.display_name}** ir unbanots no servera!'
+    await channel.send(to_send)
+
 async def change_role(discord_id, new_role_id, current_role_id=0):
     member = get(lvguild.members, id=discord_id)
     if current_role_id != 0:
