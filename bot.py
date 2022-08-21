@@ -9,20 +9,20 @@ import asyncio
 from dateutil import parser
 from datetime import datetime, timedelta, timezone
 from rosu_pp_py import Calculator, ScoreParams
-from math import isclose
 import time
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 API_CLIENT_ID = os.getenv('API_CLIENT_ID') #osu api client id
 API_CLIENT_SECRET = os.getenv('API_CLIENT_SECRET') #osu api client secret
-SERVER_ID = int(os.getenv('SERVER_ID'))
+SERVER_ID = int(os.getenv('SERVER_ID')) #discord server id
 OSU_API_TOKEN = os.getenv('OSU_API_TOKEN')
-BOT_CHANNEL_ID = int(os.getenv('BOT_CHANNEL_ID'))
+BOT_CHANNEL_ID = int(os.getenv('BOT_CHANNEL_ID')) #private channel for admin commands
 
+#postgresql database url
 DATABASE_URL = os.getenv('DATABASE_URL')
 
-
+#Discord role IDs for country rank roles.
 roles = {
     'LV1': 202057149860282378,
     'LV5': 202061474213003265,
@@ -38,8 +38,10 @@ roles = {
     'inactive': 964604143912255509
 }
 
+#Reverse dictionary to get the role name from the ID.
 rev_roles = dict((v,k) for k,v in roles.items())
 
+#Dictionary to compare roles, to see which one's higher or lower.
 rolesvalue = dict((key,count) for count, key in enumerate(roles.keys()))
 
 async def get_role_with_rank(rank):
@@ -65,6 +67,7 @@ async def get_role_with_rank(rank):
         case rank if rank > 1000:
             return 'LVinf'
 
+#pp calculator needs int value but api returns mods as 2 characters
 mods_dict = {
     'NF': 1,
     'EZ': 2,
@@ -100,6 +103,7 @@ async def mods_int_from_list(mods):
         modint += mods_dict[mod]
     return modint
 
+#the personal top limit determining if a score should get posted
 user_newbest_limit = {
     'LV1': 100,
     'LV5': 80,
@@ -129,7 +133,7 @@ class OsuApiV2():
         async with self.session.post('https://osu.ppy.sh/oauth/token', data=parameters) as response:
             responsejson = await response.json()
             self.token = responsejson['access_token']
-            set_key(key_to_set='OSU_API_TOKEN', value_to_set=self.token, dotenv_path='.env')
+            set_key(key_to_set='OSU_API_TOKEN', value_to_set=self.token, dotenv_path='.env') #doesnt work
 
 
     async def get_user(self, name, mode, key):
@@ -200,6 +204,8 @@ async def start_userbest(ctx):
         print(repr(e))
         await ctx.send(f'{repr(e)} in userbest')
 
+#Takes every linked player in the database thats still in the discord server, loops through them, discards restricted or inactive users, gets the last checked time from the database
+#assumes -60 minutes from now if the time isn't in the database and sends it to get_user_newbest.
 @tasks.loop(minutes=60)
 async def user_newbest_loop():
     async with pool.acquire() as db:
@@ -228,7 +234,7 @@ async def user_newbest_loop():
             time.sleep(0.1)
 
             
-                
+
 @bot.command()
 async def delete(ctx):
     channel = bot.get_channel(266580155860779009)
@@ -237,7 +243,7 @@ async def delete(ctx):
         if message.author.id==442370931772358666:
             await message.delete()
 
-
+#Checks a users top plays up to the limit, checks if a score is set after the last checked time stored in the database, and if it is then sends it to post_user_newbest.
 async def get_user_newbest(osu_id, limit, last_checked):
     user_scores = await osuapi.get_scores(osu_id=osu_id, type='best', mode='osu', limit=limit)
     for index, score in enumerate(user_scores, start=1):
@@ -248,7 +254,7 @@ async def get_user_newbest(osu_id, limit, last_checked):
                 osu_user = await osuapi.get_user(name=osu_id, mode='osu', key='id')
             await post_user_newbest(score=score, limit=limit, scoretime=score_time, score_rank=index, osu_user=osu_user)
 
-
+#Posts score in a discord embed.
 async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
     channel = bot.get_channel(266580155860779009)
     embed_color=0x0084FF
@@ -279,7 +285,7 @@ async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
     else:
         mod_text = ''
 
-
+#old format
 #    desc=f'''__**{score["pp"]:.2f}**/{calc_result.pp:.2f}pp **| #{score_rank}** personal best **|** Max:{limit}__
 ##{osu_user["statistics"]["global_rank"]} **|** #{osu_user["statistics"]["country_rank"]} {score["user"]["country_code"]} **|** {osu_user["statistics"]["pp"]:.2f}pp
 #x{score["max_combo"]}/{calc_result.maxCombo} **|** {score["rank"]} **|** {score["score"]} **|** {score["accuracy"]:.2%} **|** +{mod_text}
@@ -415,6 +421,8 @@ already_sent_messages = []
 
 @tasks.loop(minutes=5)
 #@bot.command()
+#loops through every dc member and their activities, if it finds osu then uses the username in rich presence to get the user id from osu api.
+#if the player isn't already linked in the database it links them. 
 async def link_acc():
     try:
         ctx = bot.get_channel(BOT_CHANNEL_ID)
@@ -440,12 +448,12 @@ async def link_acc():
 
                                         if osu_user['country_code'] == 'LV':
                                             result = await db.fetch(f'SELECT discord_id, osu_id FROM players WHERE osu_id = {osu_user["id"]};')
-                                            #check if discord multiaccounter
                                             if result == []:
                                                 await db.execute(f'UPDATE players SET osu_id = {osu_user["id"]} WHERE discord_id = {member.id};')
                                                 await ctx.send(f'Pievienoja {member.mention} datubāzei ar osu! kontu {osu_user["username"]} (id: {osu_user["id"]})', allowed_mentions = discord.AllowedMentions(users = False))
                                                 await refresh_user_rank(member)
                                                 continue
+                                            #check if discord multiaccounter
                                             if member.id != result[0][0]:
                                                 await db.execute(f'UPDATE players SET osu_id = {osu_user["id"]} WHERE discord_id = {member.id};')
                                                 await db.execute(f'UPDATE players SET osu_id = NULL WHERE discord_id = {result[0][0]};')
@@ -495,6 +503,7 @@ async def refresh_roles():
         async with pool.acquire() as db:
             cursor = ''
             ranking = []
+            #get the first 1000 players from LV country leaderboard
             for i in range(20):
                 response = await osuapi.get_rankings(mode='osu', type='performance', country='LV', cursor=cursor)
                 cursor = response['cursor']['page']
@@ -513,15 +522,18 @@ async def refresh_roles():
                 except ValueError:
                     country_rank = 99999
 
+                #gets the role name 'LV1','LV5'etc for the current role the player has in discord.
                 current_role = [rev_roles[role.id] for role in get(lvguild.members, id=row[0]).roles if role.id in roles.values()]
 
+                #if the player isnt found in the first 1000 players on the leaderboard, checks their account for a ban or inactivity. 
                 if country_rank == 99999:
                     osu_user = await osuapi.get_user(name=row[1], mode='osu', key='id')
                     if osu_user == {'error': None}:
-                        #set restricted role
+                        #had a case where osu api returned {'error': None} for every user, so this is a check on peppy's profile, to see if osu api is just malfunctioning.
                         osu_api_check = await osuapi.get_user(name=2, mode='osu', key='id')
                         if osu_api_check == {'error': None}:
                             continue
+                        #set restricted role
                         if current_role == []:
                             await change_role(discord_id = row[0], new_role_id=roles['restricted'])
                             await send_rolechange_msg(discord_id=row[0], notikums='restricted', osu_user=osu_user)
@@ -573,7 +585,7 @@ async def refresh_roles():
         print(repr(e))
         await ctx.send(f'{repr(e)} in role refresh')
 
-
+#seperate function to check just one user and update their role on the server
 async def refresh_user_rank(member):
     async with pool.acquire() as db: 
         query = await db.fetch(f'SELECT discord_id, osu_id FROM players WHERE osu_id IS NOT NULL AND discord_id = {member.id};')
@@ -588,7 +600,7 @@ async def refresh_user_rank(member):
             await send_rolechange_msg(discord_id=member.id, notikums='no_previous_role', role=new_role, osu_user=osu_user)
             print(f"refreshed rank for user {member.display_name}")
 
-
+#checks for users that are in the discord server but arent in the database.
 @bot.command()
 async def update_user(ctx):
     if ctx.channel.id != BOT_CHANNEL_ID:
@@ -629,7 +641,7 @@ async def pervert(ctx):
     print("added role")
 
 
-
+#purge discord roles from players that arent linked in the database. 
 @bot.command()
 async def purge_roles(ctx):
     async with pool.acquire() as db:
