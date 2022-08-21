@@ -322,18 +322,18 @@ async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
     await channel.send(embed=embed)
    
 
-#@bot.event
+@bot.event
 async def on_member_join(member):
     channel = bot.get_channel(266580155860779009)
     async with pool.acquire() as db:
         result = await db.fetch(f'SELECT discord_id FROM players WHERE discord_id = {member.id};')
         if result == []:
             await db.execute(f'INSERT INTO players (discord_id) VALUES ({member.id});')
-            to_send = f'{member.mention} ir pievienojies serverim!'
-            await channel.send(to_send, allowed_mentions = discord.AllowedMentions(users = False))
-        else:
-            to_send = f'{member.mention} ir atkal pievienojies serverim!'
-            await channel.send(to_send, allowed_mentions = discord.AllowedMentions(users = False))
+        #     to_send = f'{member.mention} ir pievienojies serverim!'
+        #     await channel.send(to_send, allowed_mentions = discord.AllowedMentions(users = False))
+        # else:
+        #     to_send = f'{member.mention} ir atkal pievienojies serverim!'
+        #     await channel.send(to_send, allowed_mentions = discord.AllowedMentions(users = False))
     
 
 @bot.event
