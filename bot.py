@@ -335,11 +335,11 @@ async def on_member_join(member):
         result = await db.fetch(f'SELECT discord_id FROM players WHERE discord_id = {member.id};')
         if result == []:
             await db.execute(f'INSERT INTO players (discord_id) VALUES ({member.id});')
-        #     to_send = f'{member.mention} ir pievienojies serverim!'
-        #     await channel.send(to_send, allowed_mentions = discord.AllowedMentions(users = False))
-        # else:
-        #     to_send = f'{member.mention} ir atkal pievienojies serverim!'
-        #     await channel.send(to_send, allowed_mentions = discord.AllowedMentions(users = False))
+            to_send = f'{member.mention} ir pievienojies serverim!'
+            await channel.send(to_send, allowed_mentions = discord.AllowedMentions(users = False))
+        else:
+            to_send = f'{member.mention} ir atkal pievienojies serverim!'
+            await channel.send(to_send, allowed_mentions = discord.AllowedMentions(users = False))
     
 
 @bot.event
