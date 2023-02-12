@@ -8,7 +8,7 @@ import aiohttp
 import asyncio
 from dateutil import parser
 from datetime import datetime, timedelta, timezone
-from rosu_pp_py import Calculator, ScoreParams
+from rosu_pp_py import Calculator, Beatmap
 import time
 
 load_dotenv()
@@ -269,15 +269,14 @@ async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
                         f.write(await resp.read())
 
 
-    pp_calc = Calculator(f'{beatmap_id}.osu')
+    beatmap = Beatmap(path=f'{beatmap_id}.osu')
+    pp_calc = Calculator(mods = mods_int_from_list(score['mods'])
     
-    calc_params = ScoreParams(
-        mods = await mods_int_from_list(score['mods'])
-    )
-    [calc_result] = pp_calc.calculate(calc_params)
+    calc_result = pp_calc.performance(beatmap)
+    map_attrs = pp_calc.map_attributes(beatmap)
     
-    time_text = str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:') if calc_result.clockRate == 1 else f"{str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:')} ({str(timedelta(seconds=round(score['beatmap']['total_length']/calc_result.clockRate))).removeprefix('0:')})"
-    bpm_text = f'{score["beatmap"]["bpm"]} BPM' if calc_result.clockRate == 1 else f'{score["beatmap"]["bpm"]} -> **{round(int(score["beatmap"]["bpm"])*calc_result.clockRate)} BPM**'
+    time_text = str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:') if map_attrs.clock_rate == 1 else f"{str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:')} ({str(timedelta(seconds=round(score['beatmap']['total_length']/map_attrs.clock_rate))).removeprefix('0:')})"
+    bpm_text = f'{score["beatmap"]["bpm"]} BPM' if map_attrs.clock_rate == 1 else f'{score["beatmap"]["bpm"]} -> **{round(int(score["beatmap"]["bpm"])*map_attrs.clock_rate)} BPM**'
     if score['mods'] != []:
         mod_text = '\t+'
         for mod in score['mods']:
@@ -285,15 +284,6 @@ async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
     else:
         mod_text = ''
 
-#old format
-#    desc=f'''__**{score["pp"]:.2f}**/{calc_result.pp:.2f}pp **| #{score_rank}** personal best **|** Max:{limit}__
-##{osu_user["statistics"]["global_rank"]} **|** #{osu_user["statistics"]["country_rank"]} {score["user"]["country_code"]} **|** {osu_user["statistics"]["pp"]:.2f}pp
-#x{score["max_combo"]}/{calc_result.maxCombo} **|** {score["rank"]} **|** {score["score"]} **|** {score["accuracy"]:.2%} **|** +{mod_text}
-#[{score["beatmapset"]["artist"]} - {score["beatmapset"]["title"]} [{score["beatmap"]["version"]}]]({score["beatmap"]["url"]})
-#{time_text} **|** {bpm_text} **|** ★**{calc_result.stars:.2f}**\n <t:{int(scoretime.timestamp())}:R>'''
-
-    #desc = f'''**[{score["beatmapset"]["artist"]} - {score["beatmapset"]["title"]} [{score["beatmap"]["version"]}] [{round(calc_result.stars, 2)}]](https://osu.ppy.sh/b/{score["beatmap"]["id"]})
-    #__Personal Best #{score_rank}__**'''
 
     desc = f'**__Personal Best #{score_rank}__**'
 
@@ -309,12 +299,12 @@ async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
     )
     embed.set_thumbnail(url=score['beatmapset']['covers']['list'])
     embed.url = f'https://osu.ppy.sh/b/{score["beatmap"]["id"]}'
-    embed.title = f'{score["beatmapset"]["artist"]} - {score["beatmapset"]["title"]} [{score["beatmap"]["version"]}] [{round(calc_result.stars, 2)}★]'
+    embed.title = f'{score["beatmapset"]["artist"]} - {score["beatmapset"]["title"]} [{score["beatmap"]["version"]}] [{round(calc_result.difficulty.stars, 2)}★]'
     #embed.set_footer(text=f'Limit: {limit}')
 
     embed.add_field(
         name = f'** {rank_emoji[score["rank"]]}{mod_text}\t{score["score"]:,}\t({round(score["accuracy"], 4):.2%}) **',
-        value = f'''**{round(score["pp"], 2)}**/{round(calc_result.pp, 2)}pp [ **{score["max_combo"]}x**/{calc_result.maxCombo}x ] {{{score["statistics"]["count_300"]}/{score["statistics"]["count_100"]}/{score["statistics"]["count_50"]}/{score["statistics"]["count_miss"]}}}
+        value = f'''**{round(score["pp"], 2)}**/{round(calc_result.pp, 2)}pp [ **{score["max_combo"]}x**/{calc_result.difficulty.max_combo}x ] {{{score["statistics"]["count_300"]}/{score["statistics"]["count_100"]}/{score["statistics"]["count_50"]}/{score["statistics"]["count_miss"]}}}
         {time_text} | {bpm_text}
         <t:{int(scoretime.timestamp())}:R> | Limit: {limit}'''
 
