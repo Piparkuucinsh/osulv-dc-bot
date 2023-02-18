@@ -101,7 +101,7 @@ async def mods_int_from_list(mods):
     modint = 0
     for mod in mods:
         modint += mods_dict[mod]
-    return modint
+    return int(modint)
 
 #the personal top limit determining if a score should get posted
 user_newbest_limit = {

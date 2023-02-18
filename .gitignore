@@ -6,3 +6,4 @@ users.db
 pg_test.py
 .vscode/
 misc_commands.py
+venv/
