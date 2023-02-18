@@ -270,7 +270,7 @@ async def post_user_newbest(score, score_rank, limit, scoretime, osu_user):
 
 
     beatmap = Beatmap(path=f'{beatmap_id}.osu')
-    pp_calc = Calculator(mods = mods_int_from_list(score['mods']))
+    pp_calc = Calculator(mods = await mods_int_from_list(score['mods']))
     
     calc_result = pp_calc.performance(beatmap)
     map_attrs = pp_calc.map_attributes(beatmap)
