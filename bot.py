@@ -325,17 +325,17 @@ async def on_member_join(member):
         result = await db.fetch(f'SELECT discord_id FROM players WHERE discord_id = {member.id};')
         if result == []:
             await db.execute(f'INSERT INTO players (discord_id) VALUES ({member.id});')
-            to_send = f'{member.mention} ir pievienojies serverim!'
+            to_send = f'{member.mention} pievienojās serverim!'
             await channel.send(to_send, allowed_mentions = discord.AllowedMentions(users = False))
         else:
-            to_send = f'{member.mention} ir atkal pievienojies serverim!'
+            to_send = f'{member.mention} atkal pievienojās serverim!'
             await channel.send(to_send, allowed_mentions = discord.AllowedMentions(users = False))
     
 
 @bot.event
 async def on_member_remove(member):
     channel = bot.get_channel(266580155860779009)
-    to_send = f'**{member.display_name}** ir izgājis no servera!'
+    to_send = f'**{member.display_name}** izgāja no servera!'
     await channel.send(to_send)
 
 @bot.event
@@ -573,7 +573,6 @@ async def refresh_roles():
         print("roles refreshed")
     except Exception as e:
         print(repr(e))
-        await ctx.send(f'{repr(e)} in role refresh')
 
 #seperate function to check just one user and update their role on the server
 async def refresh_user_rank(member):
