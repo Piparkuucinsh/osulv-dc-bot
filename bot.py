@@ -485,7 +485,7 @@ async def link_acc():
         print(repr(e))
         await ctx.send(f'{repr(e)} in link_acc')
 
-@tasks.loop(minutes=5)
+@tasks.loop(minutes=15)
 #@bot.command()
 async def refresh_roles():
     try:
