@@ -337,6 +337,7 @@ async def on_member_remove(member):
     channel = bot.get_channel(266580155860779009)
     to_send = f'**{member.display_name}** izgāja no servera!'
     await channel.send(to_send)
+    await channel.send("https://tenor.com/view/rip-bozo-gif-22294771")
 
 @bot.event
 async def on_member_ban(guild, member):
