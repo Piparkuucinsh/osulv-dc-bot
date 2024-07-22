@@ -117,6 +117,8 @@ user_newbest_limit = {
     'LVinf': 1,
 }
 
+#waywern was here 1 
+
 class OsuApiV2():
 
     token = OSU_API_TOKEN
