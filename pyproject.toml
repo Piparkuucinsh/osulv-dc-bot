@@ -10,4 +10,5 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.0.1",
     "rosu-pp-py>=1.1.0",
+    "ruff>=0.7.3",
 ]
