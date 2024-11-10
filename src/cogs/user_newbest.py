@@ -4,7 +4,7 @@ from discord.utils import get
 import asyncio
 from dateutil import parser
 from datetime import datetime, timedelta, timezone
-from rosu_pp_py import Calculator, Beatmap
+from rosu_pp_py import Beatmap, Performance
 import time
 import os
 import aiohttp
@@ -37,8 +37,8 @@ class UserNewbest(commands.Cog):
                 if row[0] not in member_id_list:
                     continue
 
-                [current_role] = [rev_roles[role.id] for role in get(self.bot.lvguild.members, id=row[0]).roles if role.id in roles.values()]
-                if rolesvalue[current_role] > 9:
+                [current_role] = [REV_ROLES[role.id] for role in get(self.bot.lvguild.members, id=row[0]).roles if role.id in ROLES.values()]
+                if ROLES_VALUE[current_role] > 9:
                     continue
 
                 if row[2] == None:
@@ -46,7 +46,7 @@ class UserNewbest(commands.Cog):
                 else:
                     last_checked = parser.parse(row[2])
                 
-                limit = user_newbest_limit[current_role]
+                limit = USER_NEWBEST_LIMIT[current_role]
 
                 await self.get_user_newbest(osu_id=row[1], limit=limit, last_checked=last_checked)
 
@@ -82,10 +82,12 @@ class UserNewbest(commands.Cog):
                             f.write(await resp.read())
 
         beatmap = Beatmap(path=f'{beatmap_id}.osu')
-        pp_calc = Calculator(mods = await self.bot.mods_int_from_list(score['mods']))
-        
-        calc_result = pp_calc.performance(beatmap)
-        map_attrs = pp_calc.map_attributes(beatmap)
+
+        perf = Performance()
+
+        perf.set_mods(mods = await self.bot.mods_int_from_list(score['mods']))
+        calc_result = perf.calculate(beatmap)
+        map_attrs = perf.map_attributes(beatmap)
         
         time_text = str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:') if map_attrs.clock_rate == 1 else f"{str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:')} ({str(timedelta(seconds=round(score['beatmap']['total_length']/map_attrs.clock_rate))).removeprefix('0:')})"
         bpm_text = f'{score["beatmap"]["bpm"]} BPM' if map_attrs.clock_rate == 1 else f'{score["beatmap"]["bpm"]} -> **{round(int(score["beatmap"]["bpm"])*map_attrs.clock_rate)} BPM**'
@@ -113,7 +115,7 @@ class UserNewbest(commands.Cog):
         embed.title = f'{score["beatmapset"]["artist"]} - {score["beatmapset"]["title"]} [{score["beatmap"]["version"]}] [{round(calc_result.difficulty.stars, 2)}★]'
 
         embed.add_field(
-            name = f'** {rank_emoji[score["rank"]]}{mod_text}\t{score["score"]:,}\t({round(score["accuracy"], 4):.2%}) **',
+            name = f'** {RANK_EMOJI[score["rank"]]}{mod_text}\t{score["score"]:,}\t({round(score["accuracy"], 4):.2%}) **',
             value = f'''**{round(score["pp"], 2)}**/{round(calc_result.pp, 2)}pp [ **{score["max_combo"]}x**/{calc_result.difficulty.max_combo}x ] {{{score["statistics"]["count_300"]}/{score["statistics"]["count_100"]}/{score["statistics"]["count_50"]}/{score["statistics"]["count_miss"]}}}
             {time_text} | {bpm_text}
             <t:{int(scoretime.timestamp())}:R> | Limit: {limit}'''

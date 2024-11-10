@@ -32,6 +32,9 @@ ROLES = {
     'INACTIVE': 964604143912255509
 }
 
+REV_ROLES = dict((v,k) for k,v in ROLES.items())
+ROLES_VALUE = dict((key,count) for count, key in enumerate(ROLES.keys()))
+
 PERVERT_ROLE = 141542874301988864
 
 BOT_SELF_ID = 442370931772358666  # bot's discord id

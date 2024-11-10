@@ -1,4 +1,5 @@
 stuff/
+__pycache__/
 db_backups/
 dcbot_env/
 .env

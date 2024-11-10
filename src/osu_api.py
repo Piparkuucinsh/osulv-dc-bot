@@ -5,8 +5,17 @@ from dotenv import set_key
 
 class OsuApiV2():
     token = OSU_API_TOKEN
-    session = aiohttp.ClientSession()
-
+    
+    def __init__(self):
+        self.session = None
+    
+    async def __aenter__(self):
+        self.session = aiohttp.ClientSession()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.session:
+            await self.session.close()
 
     async def refresh_token(self, client_id, client_secret):
         parameters = {

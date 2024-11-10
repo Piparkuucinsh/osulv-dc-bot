@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from db.player_db import get_user, create_user
+from db.db import get_user, create_user
 
 class Events(commands.Cog):
     # Constants at class level
