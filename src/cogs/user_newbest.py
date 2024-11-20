@@ -107,19 +107,22 @@ class UserNewbest(commands.Cog):
         embed_color = 0x0084FF
 
         beatmap_id = score["beatmap"]["id"]
-        if not os.path.exists(f"{beatmap_id}.osu"):
+
+        path = Path(os.getcwd(), "beatmaps", f"{beatmap_id}.osu")
+
+        if not path.exists():
             async with aiohttp.ClientSession() as s:
                 url = f"https://osu.ppy.sh/osu/{beatmap_id}"
                 async with s.get(url) as resp:
                     if resp.status == 200:
-                        path = Path(os.getcwd(), "beatmaps", f"{beatmap_id}.osu")
                         path.parent.mkdir(parents=True, exist_ok=True)
                         with path.open(
                             mode="wb",
                         ) as f:
                             f.write(await resp.read())
 
-        beatmap = Beatmap(path=f"{beatmap_id}.osu")
+        with path.open(mode="rb") as f:
+            beatmap = Beatmap(bytes=f.read())
 
         perf = Performance()
         mapattr = BeatmapAttributesBuilder()

@@ -12,6 +12,7 @@ class OsuBot(commands.Bot):
     osuapi: OsuApiV2
     db: Database
     lvguild: discord.Guild
+    session: aiohttp.ClientSession
 
     def __init__(self):
         intents = discord.Intents.default()
