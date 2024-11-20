@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 
+
 class Events(commands.Cog):
     # Constants at class level
     NOTIFICATIONS_CHANNEL_ID = 1148984358561136670
