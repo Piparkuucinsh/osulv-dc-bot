@@ -1,0 +1,38 @@
+services:
+  bot:
+    build: .
+    container_name: osu-discord-bot
+    restart: unless-stopped
+    volumes:
+      - beatmaps:/app/beatmaps
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=production
+      # Discord configuration 
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - SERVER_ID=${SERVER_ID}
+      - BOT_CHANNEL_ID=${BOT_CHANNEL_ID}
+      # osu! API configuration
+      - API_CLIENT_ID=${API_CLIENT_ID}
+      - API_CLIENT_SECRET=${API_CLIENT_SECRET}
+      # Database configuration
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    container_name: osu-bot-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - POSTGRES_DB=${POSTGRES_DB:-osulv}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  beatmaps:
+  postgres_data:
