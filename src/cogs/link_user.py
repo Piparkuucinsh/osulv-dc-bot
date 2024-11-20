@@ -139,16 +139,19 @@ class LinkUser(commands.Cog):
                                     ):
                                         continue
                                     else:
+                                        logger.exception("attribute error in link_acc")
                                         raise ae
                                 except KeyError as ke:
                                     if str(ke) == "'large_image_text'":
                                         continue
                                     else:
+                                        logger.exception("key error error in link_acc")
                                         raise ke
             logger.info("link acc finished")
 
         except Exception as e:
-            logger.error(repr(e))
+            # logger.error(repr(e))
+            logger.exception("error in link_acc")
             await ctx.send(f"{repr(e)} in link_acc")
 
     @link_acc.before_loop

@@ -22,9 +22,6 @@ class OsuApiV2:
         ) as response:
             responsejson = await response.json()
             self.token = responsejson["access_token"]
-            set_key(
-                key_to_set="OSU_API_TOKEN", value_to_set=self.token, dotenv_path=".env"
-            )  # doesnt work
 
     async def get_user(self, name, mode, key):
         async with self.session.get(

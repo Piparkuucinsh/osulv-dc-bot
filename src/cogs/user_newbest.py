@@ -9,6 +9,7 @@ import os
 import aiohttp
 from loguru import logger
 from utils import mods_int_from_list
+from pathlib import Path
 
 from config import (
     REV_ROLES,
@@ -33,7 +34,8 @@ class UserNewbest(commands.Cog):
         try:
             await self.user_newbest_loop()
         except Exception as e:
-            print(repr(e))
+            # logger.error(repr(e))
+            logger.exception("error in start_userbest")
             await ctx.send(f"{repr(e)} in userbest")
 
     @tasks.loop(minutes=60)
@@ -110,7 +112,11 @@ class UserNewbest(commands.Cog):
                 url = f"https://osu.ppy.sh/osu/{beatmap_id}"
                 async with s.get(url) as resp:
                     if resp.status == 200:
-                        with open(f"{beatmap_id}.osu", mode="wb") as f:
+                        path = Path(os.getcwd(), "beatmaps", f"{beatmap_id}.osu")
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        with path.open(
+                            mode="wb",
+                        ) as f:
                             f.write(await resp.read())
 
         beatmap = Beatmap(path=f"{beatmap_id}.osu")

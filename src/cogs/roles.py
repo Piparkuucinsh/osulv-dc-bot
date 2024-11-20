@@ -181,7 +181,7 @@ class RolesCog(commands.Cog):
 
             logger.info("roles refreshed")
         except Exception as e:
-            logger.error(repr(e))
+            logger.exception("error in refresh_roles")
 
 
 async def setup(bot):

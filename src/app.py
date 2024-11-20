@@ -41,6 +41,7 @@ class OsuBot(commands.Bot):
 
         guild = self.get_guild(SERVER_ID)
         if guild is None:
+            logger.error(f"Could not find guild with ID {SERVER_ID}")
             raise RuntimeError(f"Could not find guild with ID {SERVER_ID}")
         self.lvguild = guild
         # print(self.osuapi.token)
@@ -56,7 +57,7 @@ class OsuBot(commands.Bot):
             await self.session.close()
         await super().close()
 
-
+@logger.catch
 def main():
     bot = OsuBot()
     bot.run(DISCORD_TOKEN)

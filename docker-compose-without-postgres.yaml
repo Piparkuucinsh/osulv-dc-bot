@@ -1,0 +1,22 @@
+services:
+  bot:
+    build: .
+    container_name: osu-discord-bot
+    restart: unless-stopped
+    volumes:
+      - beatmaps:/app/beatmaps
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=production
+      # Discord configuration 
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - SERVER_ID=${SERVER_ID}
+      - BOT_CHANNEL_ID=${BOT_CHANNEL_ID}
+      # osu! API configuration
+      - API_CLIENT_ID=${API_CLIENT_ID}
+      - API_CLIENT_SECRET=${API_CLIENT_SECRET}
+      # Database configuration (external)
+      - DATABASE_URL=${DATABASE_URL}
+
+volumes:
+  beatmaps:

@@ -18,10 +18,14 @@ BOT_CHANNEL_ID = int(channel_id)
 # osu! API configuration
 API_CLIENT_ID = os.getenv("API_CLIENT_ID")  # osu api client id
 API_CLIENT_SECRET = os.getenv("API_CLIENT_SECRET")  # osu api client secret
-OSU_API_TOKEN = os.getenv("OSU_API_TOKEN")
 
 # Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL")
+database_url = os.getenv("DATABASE_URL")
+postgres_user = os.getenv("POSTGRES_USER")
+postgres_password = os.getenv("POSTGRES_PASSWORD")
+postgres_db = os.getenv("POSTGRES_DB")
+
+DATABASE_URL = database_url if database_url else f"postgresql://{postgres_user}:{postgres_password}@db:5432/{postgres_db}"
 
 ROLES = {
     "LV1": 202057149860282378,
