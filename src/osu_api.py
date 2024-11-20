@@ -5,9 +5,10 @@ from dotenv import set_key
 
 class OsuApiV2:
     token = None
+    session: aiohttp.ClientSession
 
-    def __init__(self):
-        self.session: None | aiohttp.ClientSession = None
+    # def __init__(self):
+    # self.session: None | aiohttp.ClientSession = None
 
     async def refresh_token(self):
         parameters = {

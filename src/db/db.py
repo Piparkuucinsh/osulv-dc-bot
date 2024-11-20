@@ -3,8 +3,10 @@ from config import DATABASE_URL
 
 
 class Database:
-    def __init__(self):
-        self.pool = None
+    pool: asyncpg.Pool
+
+    # def __init__(self):
+    #     self.pool = None
 
     async def setup_hook(self):
         self.pool = await asyncpg.create_pool(DATABASE_URL, ssl="require")

@@ -5,7 +5,7 @@ from loguru import logger
 
 from utils import refresh_user_rank
 
-from config import BOT_CHANNEL_ID, SERVER_ID
+from config import BOT_CHANNEL_ID
 
 OSU_APPLICATION_ID = 367827983903490050
 IMMIGRANT_ROLE_ID = 539951111382237198

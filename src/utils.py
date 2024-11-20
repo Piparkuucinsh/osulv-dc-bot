@@ -19,18 +19,22 @@ async def refresh_user_rank(member, bot):
         if query != []:
             osu_user = await bot.osuapi.get_user(name=query[0][1], mode="osu", key="id")
             new_role = await get_role_with_rank(osu_user["statistics"]["country_rank"])
-            current_role = [
+            [current_role] = [
                 role.id for role in member.roles if role.id in ROLES.values()
             ]
             if current_role == []:
-                await change_role(discord_id=member.id, new_role_id=ROLES[new_role])
+                await change_role(
+                    bot=bot, discord_id=member.id, new_role_id=ROLES[new_role]
+                )
             else:
                 await change_role(
+                    bot=bot,
                     discord_id=member.id,
                     new_role_id=ROLES[new_role],
                     current_role_id=current_role,
                 )
             await send_rolechange_msg(
+                bot=bot,
                 discord_id=member.id,
                 notikums="no_previous_role",
                 role=new_role,
@@ -56,19 +60,25 @@ async def change_role(bot, discord_id, new_role_id, current_role_id=0):
 
 
 async def send_rolechange_msg(
-    bot, notikums, discord_id, role=0, osu_id=None, osu_user=None
+    bot, notikums, discord_id, role=None, osu_id=None, osu_user=None
 ):
     channel = bot.get_channel(BOTSPAM_CHANNEL_ID)
     # member = discord.utils.get(bot.lvguild.members, id=discord_id)
 
     match notikums:
         case "no_previous_role":
+            if role is None:
+                raise ValueError("role is required for no_previous_role")
             desc = f"ir grupā **{discord.utils.get(bot.lvguild.roles, id=ROLES[role]).name}**!"
             embed_color = 0x14D121
         case "pacelas":
+            if role is None:
+                raise ValueError("role is required for pacelas")
             desc = f"pakāpās uz grupu **{discord.utils.get(bot.lvguild.roles, id=ROLES[role]).name}**!"
             embed_color = 0x14D121
         case "nokritas":
+            if role is None:
+                raise ValueError("role is required for nokritas")
             desc = f"nokritās uz grupu **{discord.utils.get(bot.lvguild.roles, id=ROLES[role]).name}**!"
             embed_color = 0xC41009
         case "restricted":

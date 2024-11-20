@@ -33,13 +33,16 @@ class OsuBot(commands.Bot):
     async def on_ready(self):
         guildstring = ""
         for guild in self.guilds:
-            guildstring += f"{guild.name}\n"
-        logger.info(f"""Logged in as {self.user} (ID: {self.user.id})
-                    ------
-                    Servers connected to:
-                    {guildstring}""")
+            guildstring += f"{guild.name}, "
 
-        self.lvguild = self.get_guild(SERVER_ID)
+        logger.info(
+            f"""Logged in as {self.user} (ID: {self.user.id if self.user else "unknown"}) Servers: {guildstring.removesuffix(", ")}"""
+        )
+
+        guild = self.get_guild(SERVER_ID)
+        if guild is None:
+            raise RuntimeError(f"Could not find guild with ID {SERVER_ID}")
+        self.lvguild = guild
         # print(self.osuapi.token)
 
         await self.load_extension("cogs.events")

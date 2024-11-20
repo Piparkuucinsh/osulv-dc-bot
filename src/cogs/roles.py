@@ -1,7 +1,7 @@
 from discord.ext import commands, tasks
 from discord.utils import get
 from loguru import logger
-from config import ROLES, REV_ROLES, BOT_CHANNEL_ID, ROLES_VALUE
+from config import ROLES, REV_ROLES, ROLES_VALUE
 
 from utils import get_role_with_rank, change_role, send_rolechange_msg
 

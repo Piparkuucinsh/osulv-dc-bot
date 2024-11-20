@@ -4,9 +4,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Discord configuration
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-SERVER_ID = int(os.getenv("SERVER_ID"))  # discord server id
-BOT_CHANNEL_ID = int(os.getenv("BOT_CHANNEL_ID"))  # private channel for admin commands
+if not (discord_token := os.getenv("DISCORD_TOKEN")):
+    raise ValueError("DISCORD_TOKEN environment variable is required")
+if not (server_id := os.getenv("SERVER_ID")):
+    raise ValueError("SERVER_ID environment variable is required")
+if not (channel_id := os.getenv("BOT_CHANNEL_ID")):
+    raise ValueError("BOT_CHANNEL_ID environment variable is required")
+
+DISCORD_TOKEN = discord_token
+SERVER_ID = int(server_id)
+BOT_CHANNEL_ID = int(channel_id)
 
 # osu! API configuration
 API_CLIENT_ID = os.getenv("API_CLIENT_ID")  # osu api client id
