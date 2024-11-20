@@ -1,26 +1,18 @@
-from config import OSU_API_TOKEN
+from config import API_CLIENT_ID, API_CLIENT_SECRET
 import aiohttp
 from dotenv import set_key
 
 
 class OsuApiV2():
-    token = OSU_API_TOKEN
+    token = None
     
     def __init__(self):
-        self.session = None
+        self.session: None | aiohttp.ClientSession = None
     
-    async def __aenter__(self):
-        self.session = aiohttp.ClientSession()
-        return self
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.session:
-            await self.session.close()
-
-    async def refresh_token(self, client_id, client_secret):
+    async def refresh_token(self):
         parameters = {
-            'client_id': client_id,
-            'client_secret': client_secret,
+            'client_id': API_CLIENT_ID,
+            'client_secret': API_CLIENT_SECRET,
             'grant_type':'client_credentials',
             'scope':'public'
             }
@@ -35,7 +27,11 @@ class OsuApiV2():
             return await response.json()
 
     async def get_rankings(self, mode, type, country, cursor):
-        async with self.session.get(f'https://osu.ppy.sh/api/v2/rankings/{mode}/{type}', params={'country':country, 'page':cursor}, headers={'Authorization':f'Bearer {self.token}'}) as response:
+        params = {'country': country}
+        if cursor is not None:
+            params['page'] = cursor
+            
+        async with self.session.get(f'https://osu.ppy.sh/api/v2/rankings/{mode}/{type}', params=params, headers={'Authorization':f'Bearer {self.token}'}) as response:
             return await response.json()
 
     async def get_scores(self, mode, osu_id, type, limit):

@@ -427,14 +427,14 @@ async def link_acc():
                                     username = osu_activity.large_image_text.split('(', 1)[0].removesuffix(' ')
                                     if username == osu_activity.large_image_text:
                                         continue
-
+                                        
                                     osu_user = await osuapi.get_user(name=username, mode='osu', key='username')
-
+                                    
                                     if osu_user == {'error': None}:
                                         continue
 
                                     result = await db.fetch(f'SELECT discord_id, osu_id FROM players WHERE discord_id = {member.id} AND osu_id IS NOT NULL')
-
+                                    
                                     if result == []:
 
                                         if osu_user['country_code'] == 'LV':
@@ -455,7 +455,7 @@ async def link_acc():
                                             if member.get_role(539951111382237198) == None:
                                                 await member.add_roles(get(lvguild.roles, id=539951111382237198))
                                                 await ctx.send(f'Lietotājs {member.mention} nav no Latvijas! (Pievienots imigranta role)')
-
+                                    
                                     else:
                                         print(f"{member.mention} jau eksistē datubāzē")
 
@@ -477,9 +477,7 @@ async def link_acc():
                                 if str(ke) == "'large_image_text'":
                                     continue
                                 else:
-                                    raise ke
-
-                
+                                    raise ke            
         print('link acc finished')
 
     except Exception as e:
@@ -607,9 +605,9 @@ async def update_user(ctx):
                 users += f'{member.name}, '
                 pievienots = True
         
-        if pievienots == True:
+        if pievienots:
             await ctx.send(f'{users.removesuffix(", ")} datubāzei.')
-        if pievienots == False:
+        if not pievienots:
             await ctx.send(f'Nevienu nepievienoja datubāzei.')
 
 

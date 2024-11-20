@@ -1,6 +1,5 @@
 import os
 from dotenv import load_dotenv
-from enum import Enum
 
 load_dotenv()
 
@@ -27,9 +26,9 @@ ROLES = {
     'LV250': 297854952435351552,
     'LV500': 915646723588751391,
     'LV1000': 915647090581966858,
-    'LVINF': 915647192755212289,
-    'RESTRICTED': 348195423841943564,
-    'INACTIVE': 964604143912255509
+    'LVinf': 915647192755212289,
+    'restricted': 348195423841943564,
+    'inactive': 964604143912255509
 }
 
 REV_ROLES = dict((v,k) for k,v in ROLES.items())
@@ -84,3 +83,15 @@ USER_NEWBEST_LIMIT = {
     'LV1000': 5,
     'LVinf': 1,
 } 
+
+ROLE_TRESHOLDS = {
+    'LV1': 1,
+    'LV5': 5,
+    'LV10': 10,
+    'LV25': 25,
+    'LV50': 50,
+    'LV100': 100,
+    'LV250': 250,
+    'LV500': 500,
+    'LV1000': 1000,
+}

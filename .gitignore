@@ -10,3 +10,4 @@ misc_commands.py
 venv/
 .ruff_cache/
 .venv/
+*.osu

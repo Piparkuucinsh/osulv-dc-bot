@@ -1,15 +1,16 @@
 import discord
 from discord.ext import commands, tasks
 from discord.utils import get
-import asyncio
 from dateutil import parser
 from datetime import datetime, timedelta, timezone
-from rosu_pp_py import Beatmap, Performance
+from rosu_pp_py import Beatmap, Performance, BeatmapAttributesBuilder
 import time
 import os
 import aiohttp
+from loguru import logger
+from utils import mods_int_from_list
 
-from config import *
+from config import REV_ROLES, ROLES, ROLES_VALUE, USER_NEWBEST_LIMIT, BOTSPAM_CHANNEL_ID, RANK_EMOJI
 
 class UserNewbest(commands.Cog):
     def __init__(self, bot):
@@ -29,19 +30,22 @@ class UserNewbest(commands.Cog):
 
     @tasks.loop(minutes=60)
     async def user_newbest_loop(self):
-        async with self.bot.pool.acquire() as db:
-            result = await db.fetch(f'SELECT * FROM players WHERE osu_id IS NOT NULL;')
+        async with self.bot.db.pool.acquire() as db:
+            result = await db.fetch('SELECT * FROM players WHERE osu_id IS NOT NULL;')
             member_id_list = [x.id for x in self.bot.lvguild.members]
 
             for row in result:
                 if row[0] not in member_id_list:
                     continue
 
-                [current_role] = [REV_ROLES[role.id] for role in get(self.bot.lvguild.members, id=row[0]).roles if role.id in ROLES.values()]
+                current_roles = [REV_ROLES[role.id] for role in get(self.bot.lvguild.members, id=row[0]).roles if role.id in ROLES.values()]
+                if not current_roles:
+                    continue
+                current_role = current_roles[0]
                 if ROLES_VALUE[current_role] > 9:
                     continue
 
-                if row[2] == None:
+                if row[2] is None:
                     last_checked = datetime.now(tz=timezone.utc) - timedelta(minutes=60)
                 else:
                     last_checked = parser.parse(row[2])
@@ -54,6 +58,8 @@ class UserNewbest(commands.Cog):
 
                 time.sleep(0.1)
 
+            logger.info('user_newbest_loop finished')
+
     @user_newbest_loop.before_loop
     async def before_user_newbest(self):
         await self.bot.wait_until_ready()
@@ -64,7 +70,7 @@ class UserNewbest(commands.Cog):
             score_time = parser.parse(score['created_at'])
             osu_user = None
             if score_time > last_checked:
-                if osu_user == None:
+                if osu_user is None:
                     osu_user = await self.bot.osuapi.get_user(name=osu_id, mode='osu', key='id')
                 await self.post_user_newbest(score=score, limit=limit, scoretime=score_time, score_rank=index, osu_user=osu_user)
 
@@ -73,7 +79,7 @@ class UserNewbest(commands.Cog):
         embed_color=0x0084FF
 
         beatmap_id = score["beatmap"]["id"]
-        if os.path.exists(f'{beatmap_id}.osu') == False:
+        if not os.path.exists(f'{beatmap_id}.osu'):
             async with aiohttp.ClientSession() as s:
                 url = f'https://osu.ppy.sh/osu/{beatmap_id}'
                 async with s.get(url) as resp:
@@ -84,10 +90,13 @@ class UserNewbest(commands.Cog):
         beatmap = Beatmap(path=f'{beatmap_id}.osu')
 
         perf = Performance()
+        mapattr = BeatmapAttributesBuilder()
 
-        perf.set_mods(mods = await self.bot.mods_int_from_list(score['mods']))
+        perf.set_mods(mods = await mods_int_from_list(score['mods']))
         calc_result = perf.calculate(beatmap)
-        map_attrs = perf.map_attributes(beatmap)
+        
+        mapattr.set_map(beatmap)
+        map_attrs = mapattr.build()
         
         time_text = str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:') if map_attrs.clock_rate == 1 else f"{str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:')} ({str(timedelta(seconds=round(score['beatmap']['total_length']/map_attrs.clock_rate))).removeprefix('0:')})"
         bpm_text = f'{score["beatmap"]["bpm"]} BPM' if map_attrs.clock_rate == 1 else f'{score["beatmap"]["bpm"]} -> **{round(int(score["beatmap"]["bpm"])*map_attrs.clock_rate)} BPM**'

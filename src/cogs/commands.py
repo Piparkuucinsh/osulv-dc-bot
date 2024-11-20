@@ -1,9 +1,9 @@
 import discord
 from discord.ext import commands
 from discord.utils import get
-import logging
+from loguru import logger
 
-from config import *
+from config import BOT_CHANNEL_ID, BOTSPAM_CHANNEL_ID, PERVERT_ROLE, BOT_SELF_ID
 
 class Commands(commands.Cog):
     def __init__(self, bot):
@@ -59,10 +59,32 @@ class Commands(commands.Cog):
         except discord.Forbidden:
             await ctx.send("Bot lacks permission to manage roles.")
         except Exception as e:
-            logging.error(f"An error occurred: {str(e)}")
+            logger.error(f"An error occurred: {str(e)}")
             channel = self.bot.get_channel(BOT_CHANNEL_ID)
             await channel.send(f"An error occurred: {str(e)}")
             
+
+    @commands.command()
+    async def update_user(self,ctx):
+        if ctx.channel.id != BOT_CHANNEL_ID:
+            return
+        async with self.bot.db.pool.acquire() as db:
+            result = await db.fetch("SELECT discord_id FROM players;")
+            db_id_list = [x[0] for x in result]
+            users = 'Pievienoja '
+            pievienots = False
+            for member in self.bot.lvguild.members:
+                if member.id not in db_id_list:
+                    await db.execute(f'INSERT INTO players (discord_id) VALUES ({member.id});')
+                    logger.info(f'update_user: added {member.name} to database')
+                    users += f'{member.name}, '
+                    pievienots = True
+            
+            if pievienots:
+                await ctx.send(f'{users.removesuffix(", ")} datubāzei.')
+            if not pievienots:
+                await ctx.send('Nevienu nepievienoja datubāzei.')
+
 
 async def setup(bot):
     await bot.add_cog(Commands(bot)) 
