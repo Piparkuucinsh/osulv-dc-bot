@@ -180,7 +180,7 @@ class RolesCog(commands.Cog):
                             continue
 
             logger.info("roles refreshed")
-        except Exception as e:
+        except Exception: 
             logger.exception("error in refresh_roles")
 
 

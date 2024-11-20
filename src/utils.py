@@ -1,6 +1,7 @@
 from config import MODS_DICT, ROLE_TRESHOLDS, BOTSPAM_CHANNEL_ID, ROLES
 import discord
 from loguru import logger
+from app import OsuBot
 
 
 async def mods_int_from_list(mods):
@@ -11,7 +12,7 @@ async def mods_int_from_list(mods):
 
 
 # seperate function to check just one user and update their role on the server
-async def refresh_user_rank(member, bot):
+async def refresh_user_rank(member, bot: OsuBot):
     async with bot.db.pool.acquire() as db:
         query = await db.fetch(
             f"SELECT discord_id, osu_id FROM players WHERE osu_id IS NOT NULL AND discord_id = {member.id};"
