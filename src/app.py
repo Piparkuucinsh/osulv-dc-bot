@@ -44,7 +44,6 @@ class OsuBot(commands.Bot):
             logger.error(f"Could not find guild with ID {SERVER_ID}")
             raise RuntimeError(f"Could not find guild with ID {SERVER_ID}")
         self.lvguild = guild
-        # print(self.osuapi.token)
 
         await self.load_extension("cogs.events")
         await self.load_extension("cogs.commands")

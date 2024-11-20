@@ -114,7 +114,7 @@ class LinkUser(commands.Cog):
                                             )
 
                                             # check if osu multiaccount (datbase osu_id != activity osu_id)
-                                            print(result[0][1])
+                                            # logger.info(result[0][1])
                                             if osu_user["id"] != result[0][1]:
                                                 if (
                                                     osu_user["id"],
@@ -150,7 +150,6 @@ class LinkUser(commands.Cog):
             logger.info("link acc finished")
 
         except Exception as e:
-            # logger.error(repr(e))
             logger.exception("error in link_acc")
             await ctx.send(f"{repr(e)} in link_acc")
 
