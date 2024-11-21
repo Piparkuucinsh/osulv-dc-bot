@@ -1,14 +1,25 @@
 from config import API_CLIENT_ID, API_CLIENT_SECRET
 import aiohttp
-from dotenv import set_key
+import time
+import functools
+from typing import Callable
 
+def ensure_valid_token(func: Callable):
+    """Decorator to ensure token is valid before making API calls"""
+    @functools.wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        current_time = time.time()
+        if (self.token is None or 
+            (current_time - self.last_token_refresh) >= self.token_refresh_interval):
+            await self.refresh_token()
+        return await func(self, *args, **kwargs)
+    return wrapper
 
 class OsuApiV2:
-    token = None
+    token: str | None = None
     session: aiohttp.ClientSession
-
-    # def __init__(self):
-    # self.session: None | aiohttp.ClientSession = None
+    last_token_refresh = 0
+    token_refresh_interval: int
 
     async def refresh_token(self):
         parameters = {
@@ -22,7 +33,10 @@ class OsuApiV2:
         ) as response:
             responsejson = await response.json()
             self.token = responsejson["access_token"]
+            self.last_token_refresh = time.time()
+            self.token_refresh_interval = responsejson["expires_in"] - 60
 
+    @ensure_valid_token
     async def get_user(self, name, mode, key):
         async with self.session.get(
             f"https://osu.ppy.sh/api/v2/users/{name}/{mode}",
@@ -31,6 +45,7 @@ class OsuApiV2:
         ) as response:
             return await response.json()
 
+    @ensure_valid_token
     async def get_rankings(self, mode, type, country, cursor):
         params = {"country": country}
         if cursor is not None:
@@ -43,6 +58,7 @@ class OsuApiV2:
         ) as response:
             return await response.json()
 
+    @ensure_valid_token
     async def get_scores(self, mode, osu_id, type, limit):
         async with self.session.get(
             f"https://osu.ppy.sh/api/v2/users/{osu_id}/scores/{type}",
@@ -51,6 +67,7 @@ class OsuApiV2:
         ) as response:
             return await response.json()
 
+    @ensure_valid_token
     async def get_user_recent(self, osu_id):
         async with self.session.get(
             f"https://osu.ppy.sh/api/v2/users/{osu_id}/recent_activity",
@@ -58,6 +75,7 @@ class OsuApiV2:
         ) as response:
             return await response.json()
 
+    @ensure_valid_token
     async def get_beatmap_score(self, mode, osu_id, beatmap_id, mods=""):
         async with self.session.get(
             f"https://osu.ppy.sh/api/v2/beatmaps/{beatmap_id}/scores/users/{osu_id}",
