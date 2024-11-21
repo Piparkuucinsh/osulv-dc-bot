@@ -27,6 +27,7 @@ postgres_db = os.getenv("POSTGRES_DB")
 
 DATABASE_URL = database_url if database_url else f"postgresql://{postgres_user}:{postgres_password}@db:5432/{postgres_db}"
 
+# role ids for rank roles
 ROLES = {
     "LV1": 202057149860282378,
     "LV5": 202061474213003265,
@@ -45,11 +46,13 @@ ROLES = {
 REV_ROLES = dict((v, k) for k, v in ROLES.items())
 ROLES_VALUE = dict((key, count) for count, key in enumerate(ROLES.keys()))
 
+# id of role to assign for access to nsfw channel
 PERVERT_ROLE = 141542874301988864
 
 BOT_SELF_ID = 442370931772358666  # bot's discord id
 
-BOTSPAM_CHANNEL_ID = 266580155860779009  # channel id for bot spam
+# channel id where new top scores and rank change messages will be sent
+BOTSPAM_CHANNEL_ID = 266580155860779009
 
 # pp calculator needs int value but api returns mods as 2 characters
 MODS_DICT = {
@@ -70,6 +73,7 @@ MODS_DICT = {
     "PF": 16416,  # 16384, Only set along with SuddenDeath. i.e: PF only gives 16416
 }
 
+# emojis for rank achieved on top score post
 RANK_EMOJI = {
     "XH": "<:SSplus:995050710406283354>",
     "X": "<:SS:995050712784453747>",
@@ -95,6 +99,7 @@ USER_NEWBEST_LIMIT = {
     "LVinf": 1,
 }
 
+# thresholds for rank roles
 ROLE_TRESHOLDS = {
     "LV1": 1,
     "LV5": 5,
