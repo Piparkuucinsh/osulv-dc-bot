@@ -7,12 +7,13 @@ from typing import Callable
 def ensure_valid_token(func: Callable):
     """Decorator to ensure token is valid before making API calls"""
     @functools.wraps(func)
-    async def wrapper(self, *args, **kwargs):
+    async def wrapper(*args, **kwargs):
+        self = args[0]
         current_time = time.time()
         if (self.token is None or 
             (current_time - self.last_token_refresh) >= self.token_refresh_interval):
             await self.refresh_token()
-        return await func(self, *args, **kwargs)
+        return await func(*args, **kwargs)
     return wrapper
 
 class OsuApiV2:

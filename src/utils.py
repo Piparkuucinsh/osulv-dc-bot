@@ -20,7 +20,7 @@ async def refresh_user_rank(member, bot: OsuBot):
         if query != []:
             osu_user = await bot.osuapi.get_user(name=query[0][1], mode="osu", key="id")
             new_role = await get_role_with_rank(osu_user["statistics"]["country_rank"])
-            [current_role] = [
+            current_role = [
                 role.id for role in member.roles if role.id in ROLES.values()
             ]
             if current_role == []:
@@ -32,7 +32,7 @@ async def refresh_user_rank(member, bot: OsuBot):
                     bot=bot,
                     discord_id=member.id,
                     new_role_id=ROLES[new_role],
-                    current_role_id=current_role,
+                    current_role_id=current_role[0],
                 )
             await send_rolechange_msg(
                 bot=bot,
