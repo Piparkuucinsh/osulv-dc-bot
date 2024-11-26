@@ -121,7 +121,7 @@ class LinkUser(commands.Cog):
                                                     result[0][1],
                                                 ) not in self.already_sent_messages:
                                                     await ctx.send(
-                                                        f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]}.'
+                                                        f'Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user["id"]} username = {osu_user["username"]}.'
                                                     )
                                                     self.already_sent_messages.append(
                                                         (osu_user["id"], result[0][1])
