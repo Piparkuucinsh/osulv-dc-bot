@@ -23,7 +23,7 @@ class Commands(commands.Cog):
             return
 
         deleted = 0
-        async for message in channel.history(limit=20): # type: ignore
+        async for message in channel.history(limit=20):  # type: ignore
             if message.author.id == BOT_SELF_ID:
                 try:
                     await message.delete()
@@ -90,20 +90,24 @@ class Commands(commands.Cog):
             if not pievienots:
                 await ctx.send("Nevienu nepievienoja datubāzei.")
 
-    #purge discord roles from players that arent linked in the database. 
+    # purge discord roles from players that arent linked in the database.
     @commands.command()
     async def purge_roles(self, ctx):
         async with self.bot.db.pool.acquire() as db:
-            result = await db.fetch("SELECT discord_id FROM players WHERE osu_id IS NOT NULL;")
+            result = await db.fetch(
+                "SELECT discord_id FROM players WHERE osu_id IS NOT NULL;"
+            )
             db_id_list = [x[0] for x in result]
             for member in self.bot.lvguild.members:
                 if member.id not in db_id_list:
-                    current_role_id = [role.id for role in member.roles if role.id in ROLES.values()]
+                    current_role_id = [
+                        role.id for role in member.roles if role.id in ROLES.values()
+                    ]
                     if current_role_id != []:
                         role = get(self.bot.lvguild.roles, id=current_role_id[0])
                         if role:
                             await member.remove_roles(role)
-                            await ctx.send(f'purged role for {member.display_name}')
+                            await ctx.send(f"purged role for {member.display_name}")
 
 
 async def setup(bot):

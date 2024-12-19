@@ -86,9 +86,10 @@ class UserNewbest(commands.Cog):
         user_scores = await self.bot.osuapi.get_scores(
             osu_id=osu_id, type="best", mode="osu", limit=limit
         )
+        osu_user = None
+        score_ids = []
         for index, score in enumerate(user_scores, start=1):
             score_time = parser.parse(score["created_at"])
-            osu_user = None
             if score_time > last_checked:
                 if osu_user is None:
                     osu_user = await self.bot.osuapi.get_user(
@@ -101,6 +102,12 @@ class UserNewbest(commands.Cog):
                     score_rank=index,
                     osu_user=osu_user,
                 )
+                score_ids.append(score["id"])
+
+        if len(score_ids) > 0:
+            logger.info(
+                f"posted {len(score_ids)} ({', '.join(score_ids)}) new best scores for {osu_user['username'] if osu_user else ""} ({osu_id})"
+            )
 
     async def post_user_newbest(self, score, score_rank, limit, scoretime, osu_user):
         channel = self.bot.get_channel(BOTSPAM_CHANNEL_ID)

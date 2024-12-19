@@ -53,9 +53,10 @@ class OsuBot(commands.Bot):
         await self.load_extension("cogs.user_newbest")
 
     async def close(self):
-        if hasattr(self, 'session') and self.session:
+        if hasattr(self, "session") and self.session:
             await self.session.close()
         await super().close()
+
 
 @logger.catch
 def main():

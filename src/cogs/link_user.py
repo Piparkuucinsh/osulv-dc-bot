@@ -5,7 +5,7 @@ from loguru import logger
 
 from utils import refresh_user_rank
 
-from config import BOT_CHANNEL_ID
+from config import BOT_CHANNEL_ID, POST_REQUEST_URL, POST_REQUEST_TOKEN
 
 OSU_APPLICATION_ID = 367827983903490050
 IMMIGRANT_ROLE_ID = 539951111382237198
@@ -148,6 +148,31 @@ class LinkUser(commands.Cog):
                                         logger.exception("key error error in link_acc")
                                         raise ke
             logger.info("link acc finished")
+            if POST_REQUEST_URL and POST_REQUEST_TOKEN:
+                try:
+                    async with self.bot.db.pool.acquire() as db:
+                        result = await db.fetch(
+                            "SELECT discord_id, osu_id FROM players WHERE osu_id IS NOT NULL;"
+                        )
+                        result_json = [
+                            {"discord_id": str(r[0]), "osu_id": str(r[1])}
+                            for r in result
+                        ]
+                        resp = await self.bot.session.post(
+                            POST_REQUEST_URL,
+                            json={"users": result_json},
+                            headers={"Authorization": POST_REQUEST_TOKEN},
+                        )
+                        if resp.status == 201:
+                            logger.info(
+                                f"{resp.status}: posted {len(result)} users to post_request_url"
+                            )
+                        else:
+                            logger.error(
+                                f"{resp.status}: failed to post {len(result)} users to post_request_url"
+                            )
+                except Exception:
+                    logger.exception("error in posting users to post_request_url")
 
         except Exception as e:
             logger.exception("error in link_acc")

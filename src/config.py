@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Discord configuration
 if not (discord_token := os.getenv("DISCORD_TOKEN")):
@@ -25,7 +25,14 @@ postgres_user = os.getenv("POSTGRES_USER")
 postgres_password = os.getenv("POSTGRES_PASSWORD")
 postgres_db = os.getenv("POSTGRES_DB")
 
-DATABASE_URL = database_url if database_url else f"postgresql://{postgres_user}:{postgres_password}@db:5432/{postgres_db}"
+DATABASE_URL = (
+    database_url
+    if database_url
+    else f"postgresql://{postgres_user}:{postgres_password}@db:5432/{postgres_db}"
+)
+
+POST_REQUEST_URL = os.getenv("POST_REQUEST_URL")
+POST_REQUEST_TOKEN = os.getenv("POST_REQUEST_TOKEN")
 
 # role ids for rank roles
 ROLES = {
