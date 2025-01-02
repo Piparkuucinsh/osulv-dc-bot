@@ -102,11 +102,11 @@ class UserNewbest(commands.Cog):
                     score_rank=index,
                     osu_user=osu_user,
                 )
-                score_ids.append(score["id"])
+                score_ids.append(str(score["id"]))
 
         if len(score_ids) > 0:
             logger.info(
-                f"posted {len(score_ids)} ({', '.join(score_ids)}) new best scores for {osu_user['username'] if osu_user else ""} ({osu_id})"
+                f"posted {len(score_ids)} ({', '.join(score_ids)}) new best scores for {osu_user['username'] if osu_user else ''} ({osu_id})"
             )
 
     async def post_user_newbest(self, score, score_rank, limit, scoretime, osu_user):
