@@ -2,13 +2,17 @@ from config import MODS_DICT, ROLE_TRESHOLDS, BOTSPAM_CHANNEL_ID, ROLES
 import discord
 from loguru import logger
 from app import OsuBot
+from ossapi import GameMode, UserLookupKey
 
 
 async def mods_int_from_list(mods):
-    modint = 0
+    mod_bits = 0
     for mod in mods:
-        modint += MODS_DICT[mod]
-    return int(modint)
+        if hasattr(mod, "value") and isinstance(getattr(mod, "value"), int):
+            mod_bits |= int(getattr(mod, "value"))
+        else:
+            mod_bits |= MODS_DICT[str(mod)]
+    return int(mod_bits)
 
 
 # seperate function to check just one user and update their role on the server
@@ -18,8 +22,8 @@ async def refresh_user_rank(member, bot: OsuBot):
             f"SELECT discord_id, osu_id FROM players WHERE osu_id IS NOT NULL AND discord_id = {member.id};"
         )
         if query != []:
-            osu_user = await bot.osuapi.get_user(name=query[0][1], mode="osu", key="id")
-            new_role = await get_role_with_rank(osu_user["statistics"]["country_rank"])
+            osu_user = await bot.osuapi.user(query[0][1], mode=GameMode.OSU, key=UserLookupKey.ID)
+            new_role = await get_role_with_rank(getattr(osu_user.statistics, "country_rank", 99999))
             current_role = [
                 role.id for role in member.roles if role.id in ROLES.values()
             ]
@@ -95,12 +99,12 @@ async def send_rolechange_msg(
     embed = discord.Embed(description=desc, color=embed_color)
 
     if osu_user is None:
-        osu_user = await bot.osuapi.get_user(name=osu_id, mode="osu", key="id")
+        osu_user = await bot.osuapi.user(osu_id, mode=GameMode.OSU, key=UserLookupKey.ID)
 
     embed.set_author(
-        name=osu_user["username"],
-        url=f"https://osu.ppy.sh/users/{osu_user['id']}",
-        icon_url=osu_user["avatar_url"],
+        name=osu_user.username,
+        url=f"https://osu.ppy.sh/users/{osu_user.id}",
+        icon_url=osu_user.avatar_url,
     )
 
     await channel.send(embed=embed)
