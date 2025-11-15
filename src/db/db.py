@@ -9,7 +9,7 @@ class Database:
     #     self.pool = None
 
     async def setup_hook(self):
-        self.pool = await asyncpg.create_pool(DATABASE_URL, ssl="require")
+        self.pool = await asyncpg.create_pool(DATABASE_URL, ssl="prefer")
 
     async def get_user(self, discord_id: int):
         """Get user from database with discord_id"""
