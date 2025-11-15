@@ -25,7 +25,7 @@ class OsuBot(commands.Bot):
         self.db = Database()
         self._on_ready_finished = False
 
-        super().__init__(command_prefix="!", intents=intents)
+        super().__init__(intents=intents)
 
     async def setup_hook(self):
         self.session = aiohttp.ClientSession()
