@@ -1,5 +1,6 @@
 import asyncpg
 from config import DATABASE_URL
+from .schema import ensure_players_table
 
 
 class Database:
@@ -10,6 +11,18 @@ class Database:
 
     async def setup_hook(self):
         self.pool = await asyncpg.create_pool(DATABASE_URL, ssl="prefer")
+
+        # Ensure players table exists and matches expected schema. If verification
+        # fails, raise an exception so the application can shut down safely.
+        try:
+            await ensure_players_table(self.pool)
+        except Exception:
+            # close pool if verification fails
+            try:
+                await self.pool.close()
+            except Exception:
+                pass
+            raise
 
     async def get_user(self, discord_id: int):
         """Get user from database with discord_id"""

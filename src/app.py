@@ -31,7 +31,16 @@ class OsuBot(commands.Bot):
         self.session = aiohttp.ClientSession()
         self.osuapi.session = self.session
         await self.osuapi.refresh_token()
-        await self.db.setup_hook()
+        try:
+            await self.db.setup_hook()
+        except Exception as e:
+            logger.exception("Database schema verification failed on startup: {}", e)
+            # Shutdown gracefully to avoid running with an invalid schema
+            try:
+                await self.close()
+            finally:
+                # Re-raise so the process exits with a non-zero status
+                raise
         
         # Load extensions - app commands are automatically registered when cogs are loaded
         await self.load_extension("cogs.events")
