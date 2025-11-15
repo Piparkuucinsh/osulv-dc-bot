@@ -23,6 +23,7 @@ class RolesCog(commands.Cog):
 
     @tasks.loop(minutes=15)
     async def refresh_roles(self) -> None:
+        logger.info("Starting refresh_roles task execution")
         try:
             # ctx = self.bot.get_channel(BOT_CHANNEL_ID)
             async with self.bot.db.pool.acquire() as db:
@@ -77,8 +78,9 @@ class RolesCog(commands.Cog):
                             osu_user = await self.bot.osuapi.user(
                                 row[1], mode=GameMode.OSU, key=UserLookupKey.ID
                             )
-                        except Exception:
+                        except Exception as e:
                             osu_user = None
+
                         if osu_user is None:
                             if current_role == []:
                                 await change_role(

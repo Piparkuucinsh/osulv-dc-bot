@@ -1,12 +1,11 @@
-from config import MODS_DICT, ROLE_TRESHOLDS, BOTSPAM_CHANNEL_ID, ROLES
+from config import ROLE_TRESHOLDS, BOTSPAM_CHANNEL_ID, ROLES
 import discord
 from discord.ext import commands
 from loguru import logger
 from app import OsuBot
 from ossapi import GameMode, UserLookupKey
-from ossapi.models import Mod, User, NonLegacyMod
+from ossapi.models import User
 import asyncio
-from typing import Sequence
 
 # Admin role ID that can use admin commands
 ADMIN_ROLE_ID = 141542368972111872
@@ -60,16 +59,6 @@ class BaseCog(commands.Cog):
                 await interaction.response.send_message(
                     f"An error occurred: {str(error)}", ephemeral=True
                 )
-
-
-async def mods_int_from_list(mods: Sequence[Mod | NonLegacyMod | str]) -> int:
-    mod_bits = 0
-    for mod in mods:
-        if hasattr(mod, "value") and isinstance(getattr(mod, "value"), int):
-            mod_bits |= int(getattr(mod, "value"))
-        else:
-            mod_bits |= MODS_DICT[str(mod)]
-    return int(mod_bits)
 
 
 # seperate function to check just one user and update their role on the server
@@ -131,6 +120,35 @@ async def change_role(
     if new_role is None:
         raise ValueError(f"Role {new_role_id} not found in guild")
     await member.add_roles(new_role)
+
+
+async def update_users_in_database(bot: OsuBot) -> list[discord.Member]:
+    """Update users in database by adding any guild members that aren't already in the database.
+
+    Returns:
+        list[discord.Member]: List of members that were added to the database
+    """
+    async with bot.db.pool.acquire() as db:
+        result = await db.fetch("SELECT discord_id FROM players;")
+        db_id_list = [x[0] for x in result]
+        added_members: list[discord.Member] = []
+
+        for member in bot.lvguild.members:
+            if member.id not in db_id_list:
+                await db.execute(
+                    f"INSERT INTO players (discord_id) VALUES ({member.id});"
+                )
+                logger.warning(
+                    f"update_user: User {member.name} (ID: {member.id}) was not in database and has been added"
+                )
+                added_members.append(member)
+
+        if added_members:
+            logger.info(f"update_user: Added {len(added_members)} user(s) to database")
+        else:
+            logger.info("update_user: No new users to add to database")
+
+        return added_members
 
 
 async def send_rolechange_msg(

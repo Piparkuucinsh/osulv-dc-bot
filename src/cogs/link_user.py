@@ -24,6 +24,7 @@ class LinkUser(commands.Cog):
 
     @tasks.loop(minutes=5)
     async def link_acc(self) -> None:
+        logger.info("Starting link_acc task execution")
         ctx: discord.TextChannel | None = None
         try:
             channel = self.bot.get_channel(BOT_CHANNEL_ID)
@@ -67,7 +68,12 @@ class LinkUser(commands.Cog):
                                                 mode=GameMode.OSU,
                                                 key=UserLookupKey.USERNAME,
                                             )
-                                        except Exception:
+                                        except Exception as e:
+                                            # API call failed (user not found, rate limit, network error, etc.)
+                                            # Log at debug level since this is expected for invalid usernames
+                                            logger.debug(
+                                                f"Failed to fetch osu! user '{username}' for member {member.id}: {e}"
+                                            )
                                             continue
 
                                         queryString = f"SELECT discord_id, osu_id FROM players WHERE discord_id = {member.id} AND osu_id IS NOT NULL"
@@ -78,7 +84,7 @@ class LinkUser(commands.Cog):
                                                 f"SELECT discord_id FROM players WHERE discord_id = {member.id}"
                                             )
                                             if in_db_check == []:
-                                                logger.warning(
+                                                logger.error(
                                                     f"link_user: discord member {member.id} not in db"
                                                 )
                                                 continue
@@ -197,8 +203,6 @@ class LinkUser(commands.Cog):
 
         except Exception as e:
             logger.exception("error in link_acc")
-            if ctx and isinstance(ctx, discord.TextChannel):
-                await ctx.send(f"{repr(e)} in link_acc")
 
     @link_acc.before_loop
     async def before_link_acc(self) -> None:

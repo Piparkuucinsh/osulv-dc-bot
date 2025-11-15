@@ -11,7 +11,7 @@ from config import (
     ROLES,
     SERVER_ID,
 )
-from utils import admin_or_role_check, BaseCog
+from utils import admin_or_role_check, BaseCog, update_users_in_database
 
 
 class Commands(BaseCog):
@@ -123,26 +123,17 @@ class Commands(BaseCog):
             return
 
         await interaction.response.defer()
-        async with self.bot.db.pool.acquire() as db:
-            result = await db.fetch("SELECT discord_id FROM players;")
-            db_id_list = [x[0] for x in result]
-            users = "Pievienoja "
-            pievienots = False
-            for member in self.bot.lvguild.members:
-                if member.id not in db_id_list:
-                    await db.execute(
-                        f"INSERT INTO players (discord_id) VALUES ({member.id});"
-                    )
-                    logger.info(f"update_user: added {member.name} to database")
-                    users += f"{member.name}, "
-                    pievienots = True
 
-            if pievienots:
-                await interaction.followup.send(
-                    f"{users.removesuffix(', ')} datubāzei."
-                )
-            if not pievienots:
-                await interaction.followup.send("Nevienu nepievienoja datubāzei.")
+        # Run the update and get added users
+        added_members = await update_users_in_database(self.bot)
+
+        if added_members:
+            users = "Pievienoja "
+            for member in added_members:
+                users += f"{member.name}, "
+            await interaction.followup.send(f"{users.removesuffix(', ')} datubāzei.")
+        else:
+            await interaction.followup.send("Nevienu nepievienoja datubāzei.")
 
     @discord.app_commands.command(
         name="purge_roles",

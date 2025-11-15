@@ -9,7 +9,7 @@ import os
 import aiohttp
 from loguru import logger
 from app import OsuBot
-from utils import mods_int_from_list, admin_or_role_check, BaseCog, wait_for_on_ready
+from utils import admin_or_role_check, BaseCog, wait_for_on_ready
 from pathlib import Path
 
 from config import (
@@ -59,46 +59,63 @@ class UserNewbest(BaseCog):
 
     @tasks.loop(minutes=60)
     async def user_newbest_loop(self) -> None:
-        async with self.bot.db.pool.acquire() as db:
-            result = await db.fetch("SELECT * FROM players WHERE osu_id IS NOT NULL;")
-            member_id_list = [x.id for x in self.bot.lvguild.members]
-
-            for row in result:
-                if row[0] not in member_id_list:
-                    continue
-
-                member = get(self.bot.lvguild.members, id=row[0])
-                if member is None:
-                    continue
-                current_roles = [
-                    REV_ROLES[role.id]
-                    for role in member.roles
-                    if role.id in ROLES.values()
-                ]
-                if not current_roles:
-                    continue
-                current_role = current_roles[0]
-                if ROLES_VALUE[current_role] > 9:
-                    continue
-
-                if row[2] is None:
-                    last_checked = datetime.now(tz=timezone.utc) - timedelta(minutes=60)
-                else:
-                    last_checked = parser.parse(row[2])
-
-                limit = USER_NEWBEST_LIMIT[current_role]
-
-                await self.get_user_newbest(
-                    osu_id=row[1], limit=limit, last_checked=last_checked
+        try:
+            logger.info("Starting user_newbest_loop task execution")
+            async with self.bot.db.pool.acquire() as db:
+                result = await db.fetch(
+                    "SELECT * FROM players WHERE osu_id IS NOT NULL;"
                 )
+                member_id_list = [x.id for x in self.bot.lvguild.members]
 
-                await db.execute(
-                    f"UPDATE players SET last_checked = '{datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat()}' WHERE discord_id = {row[0]}"
-                )
+                for row in result:
+                    try:
+                        if row[0] not in member_id_list:
+                            continue
 
-                time.sleep(0.1)
+                        member = get(self.bot.lvguild.members, id=row[0])
+                        if member is None:
+                            raise ValueError(
+                                f"user_newbest_loop: Member {row[0]} not found in guild"
+                            )
+                        current_roles = [
+                            REV_ROLES[role.id]
+                            for role in member.roles
+                            if role.id in ROLES.values()
+                        ]
+                        if not current_roles:
+                            continue
+                        current_role = current_roles[0]
+                        if ROLES_VALUE[current_role] > 9:
+                            continue
 
-            logger.info("user_newbest_loop finished")
+                        if row[2] is None:
+                            last_checked = datetime.now(tz=timezone.utc) - timedelta(
+                                minutes=60
+                            )
+                        else:
+                            last_checked = parser.parse(row[2])
+
+                        limit = USER_NEWBEST_LIMIT[current_role]
+
+                        await self.get_user_newbest(
+                            osu_id=row[1], limit=limit, last_checked=last_checked
+                        )
+
+                        await db.execute(
+                            f"UPDATE players SET last_checked = '{datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat()}' WHERE discord_id = {row[0]}"
+                        )
+
+                        time.sleep(0.1)
+
+                    except Exception:
+                        logger.exception(
+                            f"error in user_newbest_loop while processing user with discord id {row[0]} and osu id {row[1]}"
+                        )
+                        continue
+
+                logger.info("user_newbest_loop finished")
+        except Exception:
+            logger.exception("error in user_newbest_loop")
 
     @user_newbest_loop.before_loop
     async def before_user_newbest(self) -> None:
@@ -118,10 +135,10 @@ class UserNewbest(BaseCog):
         osu_user = None
         score_ids = []
         for index, score in enumerate(user_scores, start=1):
-            score_time = getattr(score, "created_at", None)
+            score_time = score.ended_at
             if isinstance(score_time, str):
                 score_time = parser.parse(score_time)
-            if score_time is not None and score_time > last_checked:
+            if score_time > last_checked:
                 if osu_user is None:
                     osu_user = await self.bot.osuapi.user(
                         osu_id, mode=GameMode.OSU, key=UserLookupKey.ID
@@ -133,9 +150,8 @@ class UserNewbest(BaseCog):
                     score_rank=index,
                     osu_user=osu_user,
                 )
-                score_id = getattr(score, "id", None)
-                if score_id is not None:
-                    score_ids.append(str(score_id))
+                if score.id is not None:
+                    score_ids.append(str(score.id))
 
         if len(score_ids) > 0:
             logger.info(
@@ -153,13 +169,22 @@ class UserNewbest(BaseCog):
         channel = self.bot.get_channel(BOTSPAM_CHANNEL_ID)
         if not channel or not isinstance(channel, discord.TextChannel):
             raise ValueError(
-                f"Channel {BOTSPAM_CHANNEL_ID} not found or is not a text channel"
+                f"post_user_newbest: Channel {BOTSPAM_CHANNEL_ID} not found or is not a text channel"
             )
         embed_color = 0x0084FF
 
-        beatmap_id = getattr(score.beatmap, "id", None)
-        if beatmap_id is None:
-            raise ValueError("Score beatmap ID is missing")
+        if score.ruleset_id != 0:
+            raise ValueError(
+                f"Score is not osu! standard mode (ruleset_id: {score.ruleset_id})"
+            )
+        if score.beatmap is None:
+            raise ValueError("Score beatmap is missing")
+        if score.beatmapset is None:
+            raise ValueError("Score beatmapset is missing")
+        if osu_user.statistics is None:
+            raise ValueError("User statistics is missing")
+
+        beatmap_id = score.beatmap_id
 
         path = Path(os.getcwd(), "beatmaps", f"{beatmap_id}.osu")
 
@@ -180,20 +205,22 @@ class UserNewbest(BaseCog):
         perf = Performance(lazer=False)
         mapattr = BeatmapAttributesBuilder()
 
-        score_mods = getattr(score, "mods", [])
-        perf.set_mods(mods=await mods_int_from_list(score_mods))
+        score_mods = score.mods
+        perf.set_mods(mods=[{"acronym": mod.acronym} for mod in score_mods])
         calc_result = perf.calculate(beatmap)
 
         mapattr.set_map(beatmap)
         map_attrs = mapattr.build()
 
-        total_length = getattr(score.beatmap, "total_length", 0)
+        total_length = score.beatmap.total_length
         time_text = (
             str(timedelta(seconds=total_length)).removeprefix("0:")
             if map_attrs.clock_rate == 1
             else f"{str(timedelta(seconds=total_length)).removeprefix('0:')} ({str(timedelta(seconds=round(total_length / map_attrs.clock_rate))).removeprefix('0:')})"
         )
-        bpm = getattr(score.beatmap, "bpm", 0)
+        bpm = score.beatmap.bpm
+        if bpm is None:
+            raise ValueError("Score beatmap BPM is missing")
         bpm_text = (
             f"{bpm} BPM"
             if map_attrs.clock_rate == 1
@@ -202,7 +229,7 @@ class UserNewbest(BaseCog):
         if score_mods:
             mod_text = "\t+"
             for mod in score_mods:
-                name = getattr(mod, "acronym", getattr(mod, "name", str(mod)))
+                name = mod.acronym
                 mod_text += name
         else:
             mod_text = ""
@@ -211,50 +238,49 @@ class UserNewbest(BaseCog):
 
         embed = discord.Embed(description=desc, color=embed_color)
 
-        user = getattr(score, "user", None)
-        if user is None:
-            user = osu_user
-        # user is now guaranteed to be User type
-        country_code = getattr(
-            user,
-            "country_code",
-            getattr(getattr(user, "country", None), "code", "")
-            if hasattr(user, "country")
-            else "",
-        )
-        pp = round(getattr(osu_user.statistics, "pp", 0.0), 2)
-        global_rank = getattr(osu_user.statistics, "global_rank", 0) or 0
-        country_rank = getattr(osu_user.statistics, "country_rank", 0) or 0
-        user_id = user.id
-        username = user.username
-        avatar_url = user.avatar_url
+        country_code = osu_user.country_code
+        if osu_user.statistics.pp is None:
+            raise ValueError("User statistics PP is missing")
+        pp = round(osu_user.statistics.pp, 2)
+        global_rank = osu_user.statistics.global_rank or 0
+        country_rank = osu_user.statistics.country_rank or 0
+        user_id = osu_user.id
+        username = osu_user.username
+        avatar_url = osu_user.avatar_url
         embed.set_author(
             name=f"{username}: {pp:,}pp (#{global_rank:,} {country_code}{country_rank})",
             url=f"https://osu.ppy.sh/users/{user_id}",
             icon_url=avatar_url,
         )
-        covers_list = getattr(getattr(score, "beatmapset", None), "covers", None)
-        covers_url = getattr(covers_list, "list", None) if covers_list else None
+        covers_url = score.beatmapset.covers.list
         if covers_url:
             embed.set_thumbnail(url=covers_url)
         embed.url = f"https://osu.ppy.sh/b/{beatmap_id}"
-        embed.title = f"{getattr(score.beatmapset, 'artist', '')} - {getattr(score.beatmapset, 'title', '')} [{getattr(score.beatmap, 'version', '')}] [{round(calc_result.difficulty.stars, 2)}★]"
+        artist = score.beatmapset.artist
+        title = score.beatmapset.title
+        version = score.beatmap.version
+        embed.title = f"{artist} - {title} [{version}] [{round(calc_result.difficulty.stars, 2)}★]"
 
-        rank_key = getattr(score, "rank", None)
-        if rank_key is not None and hasattr(rank_key, "value"):
-            rank_key = rank_key.value
-        else:
-            rank_key = str(rank_key) if rank_key is not None else ""
-        s_stats = getattr(score, "statistics", None) or getattr(
-            score, "legacy_statistics", None
+        rank_key = score.rank.value
+
+        # Score.statistics is a Statistics object (current format)
+        s_stats = score.statistics
+        c300 = s_stats.great or 0
+        c100 = s_stats.ok or 0
+        c50 = s_stats.meh or 0
+        cmiss = s_stats.miss or 0
+        # Score uses legacy_total_score if available and not 0, otherwise total_score
+        total_score = (
+            score.legacy_total_score
+            if score.legacy_total_score is not None and score.legacy_total_score != 0
+            else score.total_score
         )
-        c300 = getattr(s_stats, "count_300", getattr(score, "count_300", 0))
-        c100 = getattr(s_stats, "count_100", getattr(score, "count_100", 0))
-        c50 = getattr(s_stats, "count_50", getattr(score, "count_50", 0))
-        cmiss = getattr(s_stats, "count_miss", getattr(score, "count_miss", 0))
+        accuracy = score.accuracy
+        pp_value = score.pp or 0.0
+        max_combo = score.max_combo
         embed.add_field(
-            name=f"** {RANK_EMOJI.get(rank_key, '')}{mod_text}\t{getattr(score, 'score', 0):,}\t({round(getattr(score, 'accuracy', 0.0), 4):.2%}) **",
-            value=f"""**{round(getattr(score, "pp", 0.0) or 0.0, 2)}**/{round(calc_result.pp, 2)}pp [ **{getattr(score, "max_combo", 0)}x**/{calc_result.difficulty.max_combo}x ] {{{c300}/{c100}/{c50}/{cmiss}}}
+            name=f"** {RANK_EMOJI.get(rank_key, '')}{mod_text}\t{total_score:,}\t({round(accuracy, 4):.2%}) **",
+            value=f"""**{round(pp_value, 2)}**/{round(calc_result.pp, 2)}pp [ **{max_combo}x**/{calc_result.difficulty.max_combo}x ] {{{c300}/{c100}/{c50}/{cmiss}}}
             {time_text} | {bpm_text}
             <t:{int(scoretime.timestamp())}:R> | Limit: {limit}""",
         )
