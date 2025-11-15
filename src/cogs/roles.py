@@ -11,7 +11,7 @@ class RolesCog(commands.Cog):
         self.bot = bot
         self.refresh_roles.start()
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.refresh_roles.cancel()
 
     @tasks.loop(minutes=15)
@@ -32,9 +32,11 @@ class RolesCog(commands.Cog):
 
                 ranking_id_list = [x["user"]["id"] for x in ranking]
 
+                
                 result = await db.fetch(
                     "SELECT discord_id, osu_id FROM players WHERE osu_id IS NOT NULL;"
                 )
+                
                 member_id_list = [x.id for x in self.bot.lvguild.members]
 
                 for row in result:
