@@ -16,8 +16,12 @@ SERVER_ID = int(server_id)
 BOT_CHANNEL_ID = int(channel_id)
 
 # osu! API configuration
-API_CLIENT_ID = os.getenv("API_CLIENT_ID")  # osu api client id
-API_CLIENT_SECRET = os.getenv("API_CLIENT_SECRET")  # osu api client secret
+if not (api_client_id := os.getenv("API_CLIENT_ID")):
+    raise ValueError("API_CLIENT_ID environment variable is required")
+if not (api_client_secret := os.getenv("API_CLIENT_SECRET")):
+    raise ValueError("API_CLIENT_SECRET environment variable is required")
+API_CLIENT_ID = int(api_client_id)
+API_CLIENT_SECRET = api_client_secret
 
 # Database configuration
 database_url = os.getenv("DATABASE_URL")

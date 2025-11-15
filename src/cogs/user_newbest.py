@@ -197,17 +197,17 @@ class UserNewbest(BaseCog):
         embed.title = f"{getattr(score.beatmapset, 'artist', '')} - {getattr(score.beatmapset, 'title', '')} [{getattr(score.beatmap, 'version', '')}] [{round(calc_result.difficulty.stars, 2)}★]"
 
         rank_key = getattr(score, "rank", None)
-        if hasattr(rank_key, "value"):
+        if rank_key is not None and hasattr(rank_key, "value"):
             rank_key = rank_key.value
         else:
-            rank_key = str(rank_key)
+            rank_key = str(rank_key) if rank_key is not None else ""
         s_stats = getattr(score, "statistics", None) or getattr(score, "legacy_statistics", None)
         c300 = getattr(s_stats, "count_300", getattr(score, "count_300", 0))
         c100 = getattr(s_stats, "count_100", getattr(score, "count_100", 0))
         c50 = getattr(s_stats, "count_50", getattr(score, "count_50", 0))
         cmiss = getattr(s_stats, "count_miss", getattr(score, "count_miss", 0))
         embed.add_field(
-            name=f"** {RANK_EMOJI[rank_key]}{mod_text}\t{getattr(score, 'score', 0):,}\t({round(getattr(score, 'accuracy', 0.0), 4):.2%}) **",
+            name=f"** {RANK_EMOJI.get(rank_key, '')}{mod_text}\t{getattr(score, 'score', 0):,}\t({round(getattr(score, 'accuracy', 0.0), 4):.2%}) **",
             value=f"""**{round(getattr(score, 'pp', 0.0) or 0.0, 2)}**/{round(calc_result.pp, 2)}pp [ **{getattr(score, 'max_combo', 0)}x**/{calc_result.difficulty.max_combo}x ] {{{c300}/{c100}/{c50}/{cmiss}}}
             {time_text} | {bpm_text}
             <t:{int(scoretime.timestamp())}:R> | Limit: {limit}""",
