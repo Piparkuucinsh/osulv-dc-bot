@@ -19,14 +19,13 @@ class OsuBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.members = True
-        intents.message_content = True
         intents.presences = True
 
         self.osuapi = OsuApiV2()
         self.db = Database()
         self._on_ready_finished = False
 
-        super().__init__(command_prefix="!", intents=intents)
+        super().__init__(intents=intents)
 
     async def setup_hook(self):
         self.session = aiohttp.ClientSession()
