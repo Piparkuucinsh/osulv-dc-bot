@@ -9,7 +9,7 @@ class Database:
     # def __init__(self):
     #     self.pool = None
 
-    async def setup_hook(self):
+    async def setup_hook(self) -> None:
         self.pool = await asyncpg.create_pool(DATABASE_URL, ssl="prefer")
 
         # Ensure players table exists and matches expected schema. If verification
@@ -24,7 +24,7 @@ class Database:
                 pass
             raise
 
-    async def get_user(self, discord_id: int):
+    async def get_user(self, discord_id: int) -> list[asyncpg.Record]:
         """Get user from database with discord_id"""
         async with self.pool.acquire() as conn:
             result = await conn.fetch(
@@ -32,7 +32,7 @@ class Database:
             )
             return result
 
-    async def create_user(self, discord_id: int):
+    async def create_user(self, discord_id: int) -> None:
         """Create new user in database with discord_id"""
         async with self.pool.acquire() as conn:
             await conn.execute(

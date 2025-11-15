@@ -8,6 +8,7 @@ import time
 import os
 import aiohttp
 from loguru import logger
+from app import OsuBot
 from utils import mods_int_from_list, admin_or_role_check, BaseCog, wait_for_on_ready
 from pathlib import Path
 
@@ -21,23 +22,33 @@ from config import (
     SERVER_ID,
 )
 from ossapi import GameMode, ScoreType, UserLookupKey
+from ossapi.models import Score, User, NonLegacyMod
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ossapi.models import Mod
 
 
 class UserNewbest(BaseCog):
-    def __init__(self, bot):
+    def __init__(self, bot: OsuBot) -> None:
         self.bot = bot
         self.user_newbest_loop.start()
 
-    async def cog_unload(self):
+    async def cog_unload(self) -> None:
         self.user_newbest_loop.cancel()
 
-    @discord.app_commands.command(name="start_userbest", description="Manually trigger the user newbest check")
+    @discord.app_commands.command(
+        name="start_userbest", description="Manually trigger the user newbest check"
+    )
     @discord.app_commands.check(admin_or_role_check)
-    async def start_userbest(self, interaction: discord.Interaction):
+    async def start_userbest(self, interaction: discord.Interaction) -> None:
         try:
             await interaction.response.defer()
             await self.user_newbest_loop()
-            await interaction.followup.send("User newbest check completed successfully.")
+            await interaction.followup.send(
+                "User newbest check completed successfully."
+            )
         except Exception as e:
             # logger.error(repr(e))
             logger.exception("error in start_userbest")
@@ -47,7 +58,7 @@ class UserNewbest(BaseCog):
                 await interaction.response.send_message(f"{repr(e)} in userbest")
 
     @tasks.loop(minutes=60)
-    async def user_newbest_loop(self):
+    async def user_newbest_loop(self) -> None:
         async with self.bot.db.pool.acquire() as db:
             result = await db.fetch("SELECT * FROM players WHERE osu_id IS NOT NULL;")
             member_id_list = [x.id for x in self.bot.lvguild.members]
@@ -56,9 +67,12 @@ class UserNewbest(BaseCog):
                 if row[0] not in member_id_list:
                     continue
 
+                member = get(self.bot.lvguild.members, id=row[0])
+                if member is None:
+                    continue
                 current_roles = [
                     REV_ROLES[role.id]
-                    for role in get(self.bot.lvguild.members, id=row[0]).roles
+                    for role in member.roles
                     if role.id in ROLES.values()
                 ]
                 if not current_roles:
@@ -87,11 +101,13 @@ class UserNewbest(BaseCog):
             logger.info("user_newbest_loop finished")
 
     @user_newbest_loop.before_loop
-    async def before_user_newbest(self):
+    async def before_user_newbest(self) -> None:
         await self.bot.wait_until_ready()
         await wait_for_on_ready(self.bot)
 
-    async def get_user_newbest(self, osu_id, limit, last_checked):
+    async def get_user_newbest(
+        self, osu_id: int, limit: int, last_checked: datetime
+    ) -> None:
         user_scores = await self.bot.osuapi.user_scores(
             osu_id,
             type=ScoreType.BEST,
@@ -105,7 +121,7 @@ class UserNewbest(BaseCog):
             score_time = getattr(score, "created_at", None)
             if isinstance(score_time, str):
                 score_time = parser.parse(score_time)
-            if score_time > last_checked:
+            if score_time is not None and score_time > last_checked:
                 if osu_user is None:
                     osu_user = await self.bot.osuapi.user(
                         osu_id, mode=GameMode.OSU, key=UserLookupKey.ID
@@ -117,18 +133,33 @@ class UserNewbest(BaseCog):
                     score_rank=index,
                     osu_user=osu_user,
                 )
-                score_ids.append(str(getattr(score, "id", "")))
+                score_id = getattr(score, "id", None)
+                if score_id is not None:
+                    score_ids.append(str(score_id))
 
         if len(score_ids) > 0:
             logger.info(
                 f"posted {len(score_ids)} ({', '.join(score_ids)}) new best scores for {osu_user.username if osu_user else ''} ({osu_id})"
             )
 
-    async def post_user_newbest(self, score, score_rank, limit, scoretime, osu_user):
+    async def post_user_newbest(
+        self,
+        score: Score,
+        score_rank: int,
+        limit: int,
+        scoretime: datetime,
+        osu_user: User,
+    ) -> None:
         channel = self.bot.get_channel(BOTSPAM_CHANNEL_ID)
+        if not channel or not isinstance(channel, discord.TextChannel):
+            raise ValueError(
+                f"Channel {BOTSPAM_CHANNEL_ID} not found or is not a text channel"
+            )
         embed_color = 0x0084FF
 
-        beatmap_id = score.beatmap.id
+        beatmap_id = getattr(score.beatmap, "id", None)
+        if beatmap_id is None:
+            raise ValueError("Score beatmap ID is missing")
 
         path = Path(os.getcwd(), "beatmaps", f"{beatmap_id}.osu")
 
@@ -149,7 +180,8 @@ class UserNewbest(BaseCog):
         perf = Performance(lazer=False)
         mapattr = BeatmapAttributesBuilder()
 
-        perf.set_mods(mods=await mods_int_from_list(score.mods))
+        score_mods = getattr(score, "mods", [])
+        perf.set_mods(mods=await mods_int_from_list(score_mods))
         calc_result = perf.calculate(beatmap)
 
         mapattr.set_map(beatmap)
@@ -159,17 +191,17 @@ class UserNewbest(BaseCog):
         time_text = (
             str(timedelta(seconds=total_length)).removeprefix("0:")
             if map_attrs.clock_rate == 1
-            else f"{str(timedelta(seconds=total_length)).removeprefix('0:')} ({str(timedelta(seconds=round(total_length/map_attrs.clock_rate))).removeprefix('0:')})"
+            else f"{str(timedelta(seconds=total_length)).removeprefix('0:')} ({str(timedelta(seconds=round(total_length / map_attrs.clock_rate))).removeprefix('0:')})"
         )
         bpm = getattr(score.beatmap, "bpm", 0)
         bpm_text = (
             f"{bpm} BPM"
             if map_attrs.clock_rate == 1
-            else f"{bpm} -> **{round(int(bpm)*map_attrs.clock_rate)} BPM**"
+            else f"{bpm} -> **{round(int(bpm) * map_attrs.clock_rate)} BPM**"
         )
-        if getattr(score, "mods", []) != []:
+        if score_mods:
             mod_text = "\t+"
-            for mod in score.mods:
+            for mod in score_mods:
                 name = getattr(mod, "acronym", getattr(mod, "name", str(mod)))
                 mod_text += name
         else:
@@ -179,21 +211,33 @@ class UserNewbest(BaseCog):
 
         embed = discord.Embed(description=desc, color=embed_color)
 
-        user = score.user
-        country_code = getattr(user, "country_code", getattr(user.country, "code", ""))
+        user = getattr(score, "user", None)
+        if user is None:
+            user = osu_user
+        # user is now guaranteed to be User type
+        country_code = getattr(
+            user,
+            "country_code",
+            getattr(getattr(user, "country", None), "code", "")
+            if hasattr(user, "country")
+            else "",
+        )
         pp = round(getattr(osu_user.statistics, "pp", 0.0), 2)
         global_rank = getattr(osu_user.statistics, "global_rank", 0) or 0
         country_rank = getattr(osu_user.statistics, "country_rank", 0) or 0
+        user_id = user.id
+        username = user.username
+        avatar_url = user.avatar_url
         embed.set_author(
-            name=f"{user.username}: {pp:,}pp (#{global_rank:,} {country_code}{country_rank})",
-            url=f"https://osu.ppy.sh/users/{user.id}",
-            icon_url=user.avatar_url,
+            name=f"{username}: {pp:,}pp (#{global_rank:,} {country_code}{country_rank})",
+            url=f"https://osu.ppy.sh/users/{user_id}",
+            icon_url=avatar_url,
         )
         covers_list = getattr(getattr(score, "beatmapset", None), "covers", None)
         covers_url = getattr(covers_list, "list", None) if covers_list else None
         if covers_url:
             embed.set_thumbnail(url=covers_url)
-        embed.url = f"https://osu.ppy.sh/b/{score.beatmap.id}"
+        embed.url = f"https://osu.ppy.sh/b/{beatmap_id}"
         embed.title = f"{getattr(score.beatmapset, 'artist', '')} - {getattr(score.beatmapset, 'title', '')} [{getattr(score.beatmap, 'version', '')}] [{round(calc_result.difficulty.stars, 2)}★]"
 
         rank_key = getattr(score, "rank", None)
@@ -201,14 +245,16 @@ class UserNewbest(BaseCog):
             rank_key = rank_key.value
         else:
             rank_key = str(rank_key) if rank_key is not None else ""
-        s_stats = getattr(score, "statistics", None) or getattr(score, "legacy_statistics", None)
+        s_stats = getattr(score, "statistics", None) or getattr(
+            score, "legacy_statistics", None
+        )
         c300 = getattr(s_stats, "count_300", getattr(score, "count_300", 0))
         c100 = getattr(s_stats, "count_100", getattr(score, "count_100", 0))
         c50 = getattr(s_stats, "count_50", getattr(score, "count_50", 0))
         cmiss = getattr(s_stats, "count_miss", getattr(score, "count_miss", 0))
         embed.add_field(
             name=f"** {RANK_EMOJI.get(rank_key, '')}{mod_text}\t{getattr(score, 'score', 0):,}\t({round(getattr(score, 'accuracy', 0.0), 4):.2%}) **",
-            value=f"""**{round(getattr(score, 'pp', 0.0) or 0.0, 2)}**/{round(calc_result.pp, 2)}pp [ **{getattr(score, 'max_combo', 0)}x**/{calc_result.difficulty.max_combo}x ] {{{c300}/{c100}/{c50}/{cmiss}}}
+            value=f"""**{round(getattr(score, "pp", 0.0) or 0.0, 2)}**/{round(calc_result.pp, 2)}pp [ **{getattr(score, "max_combo", 0)}x**/{calc_result.difficulty.max_combo}x ] {{{c300}/{c100}/{c50}/{cmiss}}}
             {time_text} | {bpm_text}
             <t:{int(scoretime.timestamp())}:R> | Limit: {limit}""",
         )
@@ -216,5 +262,5 @@ class UserNewbest(BaseCog):
         await channel.send(embed=embed)
 
 
-async def setup(bot):
+async def setup(bot: OsuBot) -> None:
     await bot.add_cog(UserNewbest(bot), guild=discord.Object(id=SERVER_ID))

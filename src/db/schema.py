@@ -9,7 +9,9 @@ Behavior:
   columns exist with compatible types. On mismatch, verification fails
   and raises `RuntimeError` so the application can exit safely.
 """
+
 from typing import Dict
+import asyncpg
 
 
 CREATE_PLAYERS_TABLE = """
@@ -28,7 +30,7 @@ EXPECTED_COLUMNS: Dict[str, str] = {
 }
 
 
-async def ensure_players_table(pool):
+async def ensure_players_table(pool: asyncpg.Pool) -> None:
     """Ensure the `players` table exists and has the expected columns.
 
     - Creates the table if it does not exist.
@@ -44,7 +46,7 @@ async def ensure_players_table(pool):
         await verify_players_table(conn)
 
 
-async def verify_players_table(conn):
+async def verify_players_table(conn: asyncpg.Connection) -> None:
     """Verify that the `players` table has the expected columns.
 
     Uses `information_schema.columns` to obtain the column data types.
@@ -74,11 +76,15 @@ async def verify_players_table(conn):
         actual = existing[col]
         # normalize types for comparison (postgres returns 'timestamp with time zone')
         if actual != expected_type:
-            mismatches.append(f"column {col} has type {actual}, expected {expected_type}")
+            mismatches.append(
+                f"column {col} has type {actual}, expected {expected_type}"
+            )
 
     if mismatches:
         msg = (
-            "players table schema mismatch:\n" + "\n".join(mismatches) + "\n"
+            "players table schema mismatch:\n"
+            + "\n".join(mismatches)
+            + "\n"
             + "Refusing to continue to avoid data corruption. Please review the database schema."
         )
         raise RuntimeError(msg)

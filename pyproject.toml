@@ -32,3 +32,4 @@ exclude = ["**/__pycache__",
     "src/experimental",
     "src/typestubs"
 ]
+typeCheckingMode = "basic"

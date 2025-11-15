@@ -2,42 +2,57 @@ from discord.ext import commands, tasks
 from discord.utils import get
 from loguru import logger
 from config import ROLES, REV_ROLES, ROLES_VALUE
+from app import OsuBot
 
-from utils import get_role_with_rank, change_role, send_rolechange_msg, wait_for_on_ready
-from ossapi import GameMode, RankingType, UserLookupKey
-
+from utils import (
+    get_role_with_rank,
+    change_role,
+    send_rolechange_msg,
+    wait_for_on_ready,
+)
+from ossapi import GameMode, RankingType, UserLookupKey, Cursor
 
 
 class RolesCog(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: OsuBot) -> None:
         self.bot = bot
         self.refresh_roles.start()
 
-    async def cog_unload(self):
+    async def cog_unload(self) -> None:
         self.refresh_roles.cancel()
 
     @tasks.loop(minutes=15)
-    async def refresh_roles(self):
+    async def refresh_roles(self) -> None:
         try:
             # ctx = self.bot.get_channel(BOT_CHANNEL_ID)
             async with self.bot.db.pool.acquire() as db:
-                cursor = 1
                 ranking = []
                 # get the first 1000 players from LV country leaderboard
+                cursor = None
                 for i in range(20):
-                    resp = await self.bot.osuapi.rankings(
-                        GameMode.OSU, RankingType.PERFORMANCE, country="LV", page=cursor
+                    resp = await self.bot.osuapi.ranking(
+                        GameMode.OSU,
+                        RankingType.PERFORMANCE,
+                        country="LV",
+                        cursor=cursor,
                     )
-                    cursor += 1
                     ranking.extend(resp.ranking)
+                    # Stop if we got no results (last page)
+                    if len(resp.ranking) == 0:
+                        break
+                    # Use cursor from response for next page, or fallback to page-based pagination
+                    if resp.cursor is not None:
+                        cursor = resp.cursor
+                    else:
+                        # Fallback to page-based pagination if cursor not available
+                        cursor = Cursor(page=i + 2)
 
                 ranking_id_list = [x.user.id for x in ranking]
 
-                
                 result = await db.fetch(
                     "SELECT discord_id, osu_id FROM players WHERE osu_id IS NOT NULL;"
                 )
-                
+
                 member_id_list = [x.id for x in self.bot.lvguild.members]
 
                 for row in result:
@@ -48,9 +63,12 @@ class RolesCog(commands.Cog):
                     except ValueError:
                         country_rank = 99999
 
+                    member = get(self.bot.lvguild.members, id=row[0])
+                    if member is None:
+                        continue
                     current_role = [
                         REV_ROLES[role.id]
-                        for role in get(self.bot.lvguild.members, id=row[0]).roles
+                        for role in member.roles
                         if role.id in ROLES.values()
                     ]
 
@@ -186,10 +204,10 @@ class RolesCog(commands.Cog):
             logger.exception("error in refresh_roles")
 
     @refresh_roles.before_loop
-    async def before_refresh_roles(self):
+    async def before_refresh_roles(self) -> None:
         await self.bot.wait_until_ready()
         await wait_for_on_ready(self.bot)
 
 
-async def setup(bot):
+async def setup(bot: OsuBot) -> None:
     await bot.add_cog(RolesCog(bot))

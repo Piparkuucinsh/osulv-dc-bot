@@ -3,6 +3,7 @@ from discord.ext import commands, tasks
 from discord.utils import get
 from loguru import logger
 
+from app import OsuBot
 from utils import refresh_user_rank, wait_for_on_ready
 from ossapi import GameMode, UserLookupKey
 
@@ -13,33 +14,51 @@ IMMIGRANT_ROLE_ID = 539951111382237198
 
 
 class LinkUser(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: OsuBot) -> None:
         self.bot = bot
-        self.already_sent_messages = []
+        self.already_sent_messages: list[tuple[int, int]] = []
         self.link_acc.start()
 
-    async def cog_unload(self):
+    async def cog_unload(self) -> None:
         self.link_acc.cancel()
 
     @tasks.loop(minutes=5)
-    async def link_acc(self):
-        ctx = None
+    async def link_acc(self) -> None:
+        ctx: discord.TextChannel | None = None
         try:
-            ctx = self.bot.get_channel(BOT_CHANNEL_ID)
+            channel = self.bot.get_channel(BOT_CHANNEL_ID)
+            if not isinstance(channel, discord.TextChannel):
+                raise ValueError(
+                    f"Channel {BOT_CHANNEL_ID} not found or is not a text channel"
+                )
+            ctx = channel
             async with self.bot.db.pool.acquire() as db:
                 for guild in self.bot.guilds:
                     for member in guild.members:
                         if member.activities is not None:
                             for osu_activity in member.activities:
                                 try:
+                                    if not hasattr(osu_activity, "application_id"):
+                                        continue
                                     if (
-                                        osu_activity.application_id
+                                        getattr(osu_activity, "application_id", None)
                                         == OSU_APPLICATION_ID
                                     ):
-                                        username = osu_activity.large_image_text.split(
-                                            "(", 1
-                                        )[0].removesuffix(" ")
-                                        if username == osu_activity.large_image_text:
+                                        if not hasattr(
+                                            osu_activity, "large_image_text"
+                                        ):
+                                            continue
+
+                                        large_image_text = getattr(
+                                            osu_activity, "large_image_text", None
+                                        )
+                                        if large_image_text is None:
+                                            continue
+
+                                        username = large_image_text.split("(", 1)[
+                                            0
+                                        ].removesuffix(" ")
+                                        if username == large_image_text:
                                             continue
 
                                         try:
@@ -65,7 +84,9 @@ class LinkUser(commands.Cog):
                                                 continue
 
                                             country_code = getattr(
-                                                osu_user, "country_code", getattr(osu_user.country, "code", None)
+                                                osu_user,
+                                                "country_code",
+                                                getattr(osu_user.country, "code", None),
                                             )
                                             if country_code == "LV":
                                                 result = await db.fetch(
@@ -75,12 +96,13 @@ class LinkUser(commands.Cog):
                                                     await db.execute(
                                                         f"UPDATE players SET osu_id = {osu_user.id} WHERE discord_id = {member.id};"
                                                     )
-                                                    await ctx.send(
-                                                        f"Pievienoja {member.mention} datubāzei ar osu! kontu {osu_user.username} (id: {osu_user.id})",
-                                                        allowed_mentions=discord.AllowedMentions(
-                                                            users=False
-                                                        ),
-                                                    )
+                                                    if ctx:
+                                                        await ctx.send(
+                                                            f"Pievienoja {member.mention} datubāzei ar osu! kontu {osu_user.username} (id: {osu_user.id})",
+                                                            allowed_mentions=discord.AllowedMentions(
+                                                                users=False
+                                                            ),
+                                                        )
                                                     await refresh_user_rank(
                                                         member, self.bot
                                                     )
@@ -93,9 +115,10 @@ class LinkUser(commands.Cog):
                                                     await db.execute(
                                                         f"UPDATE players SET osu_id = NULL WHERE discord_id = {result[0][0]};"
                                                     )
-                                                    await ctx.send(
-                                                        f"Lietotājs {member.mention} spēlē uz osu! konta (id: {osu_user.id}), kas linkots ar <@{result[0][0]}>. Vecais konts unlinkots un linkots jaunais."
-                                                    )
+                                                    if ctx:
+                                                        await ctx.send(
+                                                            f"Lietotājs {member.mention} spēlē uz osu! konta (id: {osu_user.id}), kas linkots ar <@{result[0][0]}>. Vecais konts unlinkots un linkots jaunais."
+                                                        )
                                                     await refresh_user_rank(
                                                         member, self.bot
                                                     )
@@ -105,15 +128,19 @@ class LinkUser(commands.Cog):
                                                     member.get_role(IMMIGRANT_ROLE_ID)
                                                     is None
                                                 ):
-                                                    await member.add_roles(
-                                                        get(
-                                                            self.bot.lvguild.roles,
-                                                            id=IMMIGRANT_ROLE_ID,
+                                                    role = get(
+                                                        self.bot.lvguild.roles,
+                                                        id=IMMIGRANT_ROLE_ID,
+                                                    )
+                                                    if role is None:
+                                                        raise ValueError(
+                                                            f"Role {IMMIGRANT_ROLE_ID} not found in guild"
                                                         )
-                                                    )
-                                                    await ctx.send(
-                                                        f"Lietotājs {member.mention} nav no Latvijas! (Pievienots imigranta role)"
-                                                    )
+                                                    await member.add_roles(role)
+                                                    if ctx:
+                                                        await ctx.send(
+                                                            f"Lietotājs {member.mention} nav no Latvijas! (Pievienots imigranta role)"
+                                                        )
 
                                         else:
                                             logger.info(
@@ -127,33 +154,20 @@ class LinkUser(commands.Cog):
                                                     osu_user.id,
                                                     result[0][1],
                                                 ) not in self.already_sent_messages:
-                                                    await ctx.send(
-                                                        f"Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user.id} username = {osu_user.username}."
-                                                    )
+                                                    if ctx:
+                                                        await ctx.send(
+                                                            f"Lietotājs {member.mention} jau eksistē ar osu! id {result[0][1]}, bet pašlaik spēlē uz cita osu! konta ar id = {osu_user.id} username = {osu_user.username}."
+                                                        )
                                                     self.already_sent_messages.append(
                                                         (osu_user.id, result[0][1])
                                                     )
                                                 else:
                                                     continue
 
-                                except AttributeError as ae:
-                                    if (
-                                        str(ae)
-                                        == "'CustomActivity' object has no attribute 'application_id'"
-                                        or "'Spotify' object has no attribute 'application_id'"
-                                        or "'Game' object has no attribute 'application_id'"
-                                        or "'Streaming' object has no attribute 'application_id'"
-                                    ):
-                                        continue
-                                    else:
-                                        logger.exception("attribute error in link_acc")
-                                        raise ae
-                                except KeyError as ke:
-                                    if str(ke) == "'large_image_text'":
-                                        continue
-                                    else:
-                                        logger.exception("key error error in link_acc")
-                                        raise ke
+                                except Exception:
+                                    # Catch any unexpected errors and continue to next activity
+                                    logger.exception("error in link_acc")
+                                    continue
             logger.info("link acc finished")
             if POST_REQUEST_URL and POST_REQUEST_TOKEN:
                 try:
@@ -183,14 +197,14 @@ class LinkUser(commands.Cog):
 
         except Exception as e:
             logger.exception("error in link_acc")
-            if ctx:
+            if ctx and isinstance(ctx, discord.TextChannel):
                 await ctx.send(f"{repr(e)} in link_acc")
 
     @link_acc.before_loop
-    async def before_link_acc(self):
+    async def before_link_acc(self) -> None:
         await self.bot.wait_until_ready()
         await wait_for_on_ready(self.bot)
 
 
-async def setup(bot):
+async def setup(bot: OsuBot) -> None:
     await bot.add_cog(LinkUser(bot))
