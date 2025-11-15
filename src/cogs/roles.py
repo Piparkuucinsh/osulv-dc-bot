@@ -4,6 +4,8 @@ from loguru import logger
 from config import ROLES, REV_ROLES, ROLES_VALUE
 
 from utils import get_role_with_rank, change_role, send_rolechange_msg, wait_for_on_ready
+from ossapi import GameMode, RankingType, UserLookupKey
+
 
 
 class RolesCog(commands.Cog):
@@ -19,18 +21,17 @@ class RolesCog(commands.Cog):
         try:
             # ctx = self.bot.get_channel(BOT_CHANNEL_ID)
             async with self.bot.db.pool.acquire() as db:
-                cursor = None
+                cursor = 1
                 ranking = []
                 # get the first 1000 players from LV country leaderboard
                 for i in range(20):
-                    response = await self.bot.osuapi.get_rankings(
-                        mode="osu", type="performance", country="LV", cursor=cursor
+                    resp = await self.bot.osuapi.rankings(
+                        GameMode.OSU, RankingType.PERFORMANCE, country="LV", page=cursor
                     )
-                    # print(response)
-                    cursor = response["cursor"]["page"]
-                    ranking.extend(response["ranking"])
+                    cursor += 1
+                    ranking.extend(resp.ranking)
 
-                ranking_id_list = [x["user"]["id"] for x in ranking]
+                ranking_id_list = [x.user.id for x in ranking]
 
                 
                 result = await db.fetch(
@@ -54,15 +55,13 @@ class RolesCog(commands.Cog):
                     ]
 
                     if country_rank == 99999:
-                        osu_user = await self.bot.osuapi.get_user(
-                            name=row[1], mode="osu", key="id"
-                        )
-                        if osu_user == {"error": None}:
-                            osu_api_check = await self.bot.osuapi.get_user(
-                                name=2, mode="osu", key="id"
+                        try:
+                            osu_user = await self.bot.osuapi.user(
+                                row[1], mode=GameMode.OSU, key=UserLookupKey.ID
                             )
-                            if osu_api_check == {"error": None}:
-                                continue
+                        except Exception:
+                            osu_user = None
+                        if osu_user is None:
                             if current_role == []:
                                 await change_role(
                                     bot=self.bot,
@@ -73,7 +72,7 @@ class RolesCog(commands.Cog):
                                     bot=self.bot,
                                     discord_id=row[0],
                                     notikums="restricted",
-                                    osu_user=osu_user,
+                                    osu_user=None,
                                 )
                                 continue
                             if ROLES[current_role[0]] != ROLES["restricted"]:
@@ -87,11 +86,12 @@ class RolesCog(commands.Cog):
                                     bot=self.bot,
                                     discord_id=row[0],
                                     notikums="restricted",
-                                    osu_user=osu_user,
+                                    osu_user=None,
                                 )
                             continue
 
-                        if not osu_user["statistics"]["is_ranked"]:
+                        is_ranked = getattr(osu_user.statistics, "is_ranked", True)
+                        if not is_ranked:
                             if current_role == []:
                                 await change_role(
                                     bot=self.bot,

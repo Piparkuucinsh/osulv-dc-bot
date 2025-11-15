@@ -1,15 +1,16 @@
 import discord
 from discord.ext import commands
-from osu_api import OsuApiV2
+from ossapi import OssapiAsync
 from db.db import Database
 import aiohttp
 from loguru import logger
+from config import API_CLIENT_ID, API_CLIENT_SECRET
 
 from config import DISCORD_TOKEN, SERVER_ID
 
 
 class OsuBot(commands.Bot):
-    osuapi: OsuApiV2
+    osuapi: OssapiAsync
     db: Database
     lvguild: discord.Guild
     session: aiohttp.ClientSession
@@ -20,7 +21,7 @@ class OsuBot(commands.Bot):
         intents.members = True
         intents.presences = True
 
-        self.osuapi = OsuApiV2()
+        self.osuapi = OssapiAsync(API_CLIENT_ID, API_CLIENT_SECRET)
         self.db = Database()
         self._on_ready_finished = False
 
@@ -28,8 +29,6 @@ class OsuBot(commands.Bot):
 
     async def setup_hook(self):
         self.session = aiohttp.ClientSession()
-        self.osuapi.session = self.session
-        await self.osuapi.refresh_token()
         try:
             await self.db.setup_hook()
         except Exception as e:

@@ -20,6 +20,7 @@ from config import (
     RANK_EMOJI,
     SERVER_ID,
 )
+from ossapi import GameMode, ScoreType, UserLookupKey
 
 
 class UserNewbest(BaseCog):
@@ -91,17 +92,23 @@ class UserNewbest(BaseCog):
         await wait_for_on_ready(self.bot)
 
     async def get_user_newbest(self, osu_id, limit, last_checked):
-        user_scores = await self.bot.osuapi.get_scores(
-            osu_id=osu_id, type="best", mode="osu", limit=limit
+        user_scores = await self.bot.osuapi.user_scores(
+            osu_id,
+            type=ScoreType.BEST,
+            include_fails=False,
+            limit=limit,
+            mode=GameMode.OSU,
         )
         osu_user = None
         score_ids = []
         for index, score in enumerate(user_scores, start=1):
-            score_time = parser.parse(score["created_at"])
+            score_time = getattr(score, "created_at", None)
+            if isinstance(score_time, str):
+                score_time = parser.parse(score_time)
             if score_time > last_checked:
                 if osu_user is None:
-                    osu_user = await self.bot.osuapi.get_user(
-                        name=osu_id, mode="osu", key="id"
+                    osu_user = await self.bot.osuapi.user(
+                        osu_id, mode=GameMode.OSU, key=UserLookupKey.ID
                     )
                 await self.post_user_newbest(
                     score=score,
@@ -110,18 +117,18 @@ class UserNewbest(BaseCog):
                     score_rank=index,
                     osu_user=osu_user,
                 )
-                score_ids.append(str(score["id"]))
+                score_ids.append(str(getattr(score, "id", "")))
 
         if len(score_ids) > 0:
             logger.info(
-                f"posted {len(score_ids)} ({', '.join(score_ids)}) new best scores for {osu_user['username'] if osu_user else ''} ({osu_id})"
+                f"posted {len(score_ids)} ({', '.join(score_ids)}) new best scores for {osu_user.username if osu_user else ''} ({osu_id})"
             )
 
     async def post_user_newbest(self, score, score_rank, limit, scoretime, osu_user):
         channel = self.bot.get_channel(BOTSPAM_CHANNEL_ID)
         embed_color = 0x0084FF
 
-        beatmap_id = score["beatmap"]["id"]
+        beatmap_id = score.beatmap.id
 
         path = Path(os.getcwd(), "beatmaps", f"{beatmap_id}.osu")
 
@@ -139,29 +146,32 @@ class UserNewbest(BaseCog):
         with path.open(mode="rb") as f:
             beatmap = Beatmap(bytes=f.read())
 
-        perf = Performance()
+        perf = Performance(lazer=False)
         mapattr = BeatmapAttributesBuilder()
 
-        perf.set_mods(mods=await mods_int_from_list(score["mods"]))
+        perf.set_mods(mods=await mods_int_from_list(score.mods))
         calc_result = perf.calculate(beatmap)
 
         mapattr.set_map(beatmap)
         map_attrs = mapattr.build()
 
+        total_length = getattr(score.beatmap, "total_length", 0)
         time_text = (
-            str(timedelta(seconds=score["beatmap"]["total_length"])).removeprefix("0:")
+            str(timedelta(seconds=total_length)).removeprefix("0:")
             if map_attrs.clock_rate == 1
-            else f"{str(timedelta(seconds=score['beatmap']['total_length'])).removeprefix('0:')} ({str(timedelta(seconds=round(score['beatmap']['total_length']/map_attrs.clock_rate))).removeprefix('0:')})"
+            else f"{str(timedelta(seconds=total_length)).removeprefix('0:')} ({str(timedelta(seconds=round(total_length/map_attrs.clock_rate))).removeprefix('0:')})"
         )
+        bpm = getattr(score.beatmap, "bpm", 0)
         bpm_text = (
-            f'{score["beatmap"]["bpm"]} BPM'
+            f"{bpm} BPM"
             if map_attrs.clock_rate == 1
-            else f'{score["beatmap"]["bpm"]} -> **{round(int(score["beatmap"]["bpm"])*map_attrs.clock_rate)} BPM**'
+            else f"{bpm} -> **{round(int(bpm)*map_attrs.clock_rate)} BPM**"
         )
-        if score["mods"] != []:
+        if getattr(score, "mods", []) != []:
             mod_text = "\t+"
-            for mod in score["mods"]:
-                mod_text += mod
+            for mod in score.mods:
+                name = getattr(mod, "acronym", getattr(mod, "name", str(mod)))
+                mod_text += name
         else:
             mod_text = ""
 
@@ -169,18 +179,36 @@ class UserNewbest(BaseCog):
 
         embed = discord.Embed(description=desc, color=embed_color)
 
+        user = score.user
+        country_code = getattr(user, "country_code", getattr(user.country, "code", ""))
+        pp = round(getattr(osu_user.statistics, "pp", 0.0), 2)
+        global_rank = getattr(osu_user.statistics, "global_rank", 0) or 0
+        country_rank = getattr(osu_user.statistics, "country_rank", 0) or 0
         embed.set_author(
-            name=f'{score["user"]["username"]}: {round(osu_user["statistics"]["pp"], 2):,}pp (#{osu_user["statistics"]["global_rank"]:,} {score["user"]["country_code"]}{osu_user["statistics"]["country_rank"]})',
-            url=f'https://osu.ppy.sh/users/{score["user"]["id"]}',
-            icon_url=score["user"]["avatar_url"],
+            name=f"{user.username}: {pp:,}pp (#{global_rank:,} {country_code}{country_rank})",
+            url=f"https://osu.ppy.sh/users/{user.id}",
+            icon_url=user.avatar_url,
         )
-        embed.set_thumbnail(url=score["beatmapset"]["covers"]["list"])
-        embed.url = f'https://osu.ppy.sh/b/{score["beatmap"]["id"]}'
-        embed.title = f'{score["beatmapset"]["artist"]} - {score["beatmapset"]["title"]} [{score["beatmap"]["version"]}] [{round(calc_result.difficulty.stars, 2)}★]'
+        covers_list = getattr(getattr(score, "beatmapset", None), "covers", None)
+        covers_url = getattr(covers_list, "list", None) if covers_list else None
+        if covers_url:
+            embed.set_thumbnail(url=covers_url)
+        embed.url = f"https://osu.ppy.sh/b/{score.beatmap.id}"
+        embed.title = f"{getattr(score.beatmapset, 'artist', '')} - {getattr(score.beatmapset, 'title', '')} [{getattr(score.beatmap, 'version', '')}] [{round(calc_result.difficulty.stars, 2)}★]"
 
+        rank_key = getattr(score, "rank", None)
+        if hasattr(rank_key, "value"):
+            rank_key = rank_key.value
+        else:
+            rank_key = str(rank_key)
+        s_stats = getattr(score, "statistics", None) or getattr(score, "legacy_statistics", None)
+        c300 = getattr(s_stats, "count_300", getattr(score, "count_300", 0))
+        c100 = getattr(s_stats, "count_100", getattr(score, "count_100", 0))
+        c50 = getattr(s_stats, "count_50", getattr(score, "count_50", 0))
+        cmiss = getattr(s_stats, "count_miss", getattr(score, "count_miss", 0))
         embed.add_field(
-            name=f'** {RANK_EMOJI[score["rank"]]}{mod_text}\t{score["score"]:,}\t({round(score["accuracy"], 4):.2%}) **',
-            value=f"""**{round(score["pp"], 2)}**/{round(calc_result.pp, 2)}pp [ **{score["max_combo"]}x**/{calc_result.difficulty.max_combo}x ] {{{score["statistics"]["count_300"]}/{score["statistics"]["count_100"]}/{score["statistics"]["count_50"]}/{score["statistics"]["count_miss"]}}}
+            name=f"** {RANK_EMOJI[rank_key]}{mod_text}\t{getattr(score, 'score', 0):,}\t({round(getattr(score, 'accuracy', 0.0), 4):.2%}) **",
+            value=f"""**{round(getattr(score, 'pp', 0.0) or 0.0, 2)}**/{round(calc_result.pp, 2)}pp [ **{getattr(score, 'max_combo', 0)}x**/{calc_result.difficulty.max_combo}x ] {{{c300}/{c100}/{c50}/{cmiss}}}
             {time_text} | {bpm_text}
             <t:{int(scoretime.timestamp())}:R> | Limit: {limit}""",
         )
