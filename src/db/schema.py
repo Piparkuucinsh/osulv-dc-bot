@@ -16,7 +16,7 @@ CREATE_PLAYERS_TABLE = """
 CREATE TABLE IF NOT EXISTS players (
     discord_id BIGINT PRIMARY KEY,
     osu_id INTEGER,
-    last_checked TIMESTAMP WITH TIME ZONE
+    last_checked TEXT
 );
 """
 
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS players (
 EXPECTED_COLUMNS: Dict[str, str] = {
     "discord_id": "bigint",
     "osu_id": "integer",
-    "last_checked": "timestamp with time zone",
+    "last_checked": "text",
 }
 
 
