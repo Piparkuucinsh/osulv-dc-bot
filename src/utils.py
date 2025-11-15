@@ -144,6 +144,9 @@ async def send_rolechange_msg(
         case "unrestricted":
             desc = "ir kļuvis unrestrictots!"
             embed_color = 0x14D121
+        case _:
+            # This should never happen, but pyright needs this to know desc and embed_color are always set
+            raise ValueError(f"Unknown notikums: {notikums}")
 
     embed = discord.Embed(description=desc, color=embed_color)
 

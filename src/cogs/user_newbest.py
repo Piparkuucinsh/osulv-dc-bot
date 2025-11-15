@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 from discord.utils import get
 from dateutil import parser
 from datetime import datetime, timedelta, timezone
@@ -27,7 +27,7 @@ class UserNewbest(BaseCog):
         self.bot = bot
         self.user_newbest_loop.start()
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.user_newbest_loop.cancel()
 
     @discord.app_commands.command(name="start_userbest", description="Manually trigger the user newbest check")

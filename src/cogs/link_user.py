@@ -17,11 +17,12 @@ class LinkUser(commands.Cog):
         self.already_sent_messages = []
         self.link_acc.start()
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.link_acc.cancel()
 
     @tasks.loop(minutes=5)
     async def link_acc(self):
+        ctx = None
         try:
             ctx = self.bot.get_channel(BOT_CHANNEL_ID)
             async with self.bot.db.pool.acquire() as db:
@@ -176,7 +177,8 @@ class LinkUser(commands.Cog):
 
         except Exception as e:
             logger.exception("error in link_acc")
-            await ctx.send(f"{repr(e)} in link_acc")
+            if ctx:
+                await ctx.send(f"{repr(e)} in link_acc")
 
     @link_acc.before_loop
     async def before_link_acc(self):

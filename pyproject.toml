@@ -19,3 +19,15 @@ dependencies = [
 exclude = [
     "src/bot.py",
 ]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.407",
+]
+
+[tool.pyright]
+include = ["src"]
+exclude = ["**/__pycache__",
+    "src/experimental",
+    "src/typestubs"
+]

@@ -11,7 +11,7 @@ class RolesCog(commands.Cog):
         self.bot = bot
         self.refresh_roles.start()
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.refresh_roles.cancel()
 
     @tasks.loop(minutes=15)
