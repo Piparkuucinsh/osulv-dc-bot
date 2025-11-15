@@ -1,7 +1,60 @@
 from config import MODS_DICT, ROLE_TRESHOLDS, BOTSPAM_CHANNEL_ID, ROLES
 import discord
+from discord.ext import commands
 from loguru import logger
 from app import OsuBot
+import asyncio
+
+# Admin role ID that can use admin commands
+ADMIN_ROLE_ID = 141542368972111872
+
+
+async def wait_for_on_ready(bot) -> None:
+    """Wait for bot's on_ready to finish"""
+    while not getattr(bot, '_on_ready_finished', False):
+        await asyncio.sleep(0.1)
+
+
+async def admin_or_role_check(interaction: discord.Interaction) -> bool:
+    """Check if user is administrator or has admin role"""
+    if not interaction.guild:
+        return False
+    
+    # Get member - interaction.user should be a Member in guild context
+    # but we'll get it from guild to be safe
+    member = interaction.guild.get_member(interaction.user.id)
+    if not member:
+        return False
+    
+    # Check administrator permission
+    if member.guild_permissions.administrator:
+        return True
+    
+    # Check for admin role
+    if any(role.id == ADMIN_ROLE_ID for role in member.roles):
+        return True
+    
+    return False
+
+
+class BaseCog(commands.Cog):
+    """Base cog class with shared error handler for app commands"""
+    
+    async def cog_app_command_error(
+        self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError
+    ):
+        """Handle errors for app commands"""
+        if isinstance(error, discord.app_commands.CheckFailure):
+            await interaction.response.send_message(
+                "You don't have permission to use this command. Administrator permission or admin role required.",
+                ephemeral=True
+            )
+        else:
+            logger.exception(f"Error in app command: {error}")
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    f"An error occurred: {str(error)}", ephemeral=True
+                )
 
 
 async def mods_int_from_list(mods):

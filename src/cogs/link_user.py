@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 from discord.utils import get
 from loguru import logger
 
-from utils import refresh_user_rank
+from utils import refresh_user_rank, wait_for_on_ready
 
 from config import BOT_CHANNEL_ID, POST_REQUEST_URL, POST_REQUEST_TOKEN
 
@@ -181,6 +181,7 @@ class LinkUser(commands.Cog):
     @link_acc.before_loop
     async def before_link_acc(self):
         await self.bot.wait_until_ready()
+        await wait_for_on_ready(self.bot)
 
 
 async def setup(bot):

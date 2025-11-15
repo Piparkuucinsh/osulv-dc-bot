@@ -3,7 +3,7 @@ from discord.utils import get
 from loguru import logger
 from config import ROLES, REV_ROLES, ROLES_VALUE
 
-from utils import get_role_with_rank, change_role, send_rolechange_msg
+from utils import get_role_with_rank, change_role, send_rolechange_msg, wait_for_on_ready
 
 
 class RolesCog(commands.Cog):
@@ -182,6 +182,11 @@ class RolesCog(commands.Cog):
             logger.info("roles refreshed")
         except Exception:
             logger.exception("error in refresh_roles")
+
+    @refresh_roles.before_loop
+    async def before_refresh_roles(self):
+        await self.bot.wait_until_ready()
+        await wait_for_on_ready(self.bot)
 
 
 async def setup(bot):

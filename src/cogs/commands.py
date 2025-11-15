@@ -4,73 +4,90 @@ from discord.utils import get
 from loguru import logger
 from app import OsuBot
 
-from config import BOT_CHANNEL_ID, BOTSPAM_CHANNEL_ID, PERVERT_ROLE, BOT_SELF_ID, ROLES
+from config import BOT_CHANNEL_ID, BOTSPAM_CHANNEL_ID, PERVERT_ROLE, BOT_SELF_ID, ROLES, SERVER_ID
+from utils import admin_or_role_check, BaseCog
 
 
-class Commands(commands.Cog):
+class Commands(BaseCog):
     def __init__(self, bot):
         self.bot: OsuBot = bot
 
-    @commands.command()
-    async def delete(self, ctx):
-        if not ctx.author.guild_permissions.manage_messages:
-            await ctx.send("You don't have permission to use this command.")
-            return
+    @discord.app_commands.command(name="delete", description="Delete bot messages from botspam channel")
+    @discord.app_commands.describe(limit="Number of messages to check (default: 20)")
+    @discord.app_commands.check(admin_or_role_check)
+    async def delete(self, interaction: discord.Interaction, limit: int = 20):
 
         channel = self.bot.get_channel(BOTSPAM_CHANNEL_ID)
         if not channel:
-            await ctx.send("Target channel not found.")
+            await interaction.response.send_message("Target channel not found.", ephemeral=True)
             return
 
+        await interaction.response.defer()
         deleted = 0
-        async for message in channel.history(limit=20):  # type: ignore
+        async for message in channel.history(limit=limit):  # type: ignore
             if message.author.id == BOT_SELF_ID:
                 try:
                     await message.delete()
                     deleted += 1
                 except discord.Forbidden:
-                    await ctx.send("Bot lacks permission to delete messages.")
+                    await interaction.followup.send("Bot lacks permission to delete messages.", ephemeral=True)
                     return
                 except discord.NotFound:
                     continue
 
-        await ctx.send(f"Deleted {deleted} messages.")
+        await interaction.followup.send(f"Deleted {deleted} messages.")
 
-    @commands.command()
-    async def check(self, ctx, arg):
-        if ctx.channel.id != BOT_CHANNEL_ID:
+    @discord.app_commands.command(name="check", description="Echo a message (bot channel only)")
+    @discord.app_commands.describe(message="The message to echo")
+    @discord.app_commands.check(admin_or_role_check)
+    async def check(self, interaction: discord.Interaction, message: str):
+        if interaction.channel and interaction.channel.id != BOT_CHANNEL_ID:
+            await interaction.response.send_message("This command can only be used in the bot channel.", ephemeral=True)
             return
 
-        await ctx.send(arg)
+        await interaction.response.send_message(message)
 
-    @commands.command()
-    async def desa(self, ctx):
-        await ctx.send("<:desa:272418900111785985>")
+    @discord.app_commands.command(name="desa", description="Send desa emoji")
+    async def desa(self, interaction: discord.Interaction):
+        await interaction.response.send_message("<:desa:272418900111785985>")
 
-    @commands.command()
-    async def pervert(self, ctx):
+    @discord.app_commands.command(name="pervert", description="Add pervert role to yourself")
+    async def pervert(self, interaction: discord.Interaction):
         try:
+            if not interaction.guild:
+                await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+                return
+            
             role = get(self.bot.lvguild.roles, id=PERVERT_ROLE)
             if not role:
-                await ctx.send("Role not found.")
+                await interaction.response.send_message("Role not found.", ephemeral=True)
                 return
 
-            await ctx.author.add_roles(role)
-            await ctx.send(f"Added role to {ctx.author.display_name}")
+            # Get member from guild to ensure we have a Member object
+            member = interaction.guild.get_member(interaction.user.id)
+            if not member:
+                await interaction.response.send_message("Could not find member in guild.", ephemeral=True)
+                return
+
+            await member.add_roles(role)
+            await interaction.response.send_message(f"Added role to {member.display_name}")
         except discord.Forbidden:
-            await ctx.send("Bot lacks permission to manage roles.")
+            await interaction.response.send_message("Bot lacks permission to manage roles.", ephemeral=True)
         except Exception as e:
             logger.exception("An error occurred in pervert command")
-            channel = self.bot.get_channel(BOT_CHANNEL_ID)
-            if isinstance(channel, discord.TextChannel):
-                await channel.send(f"An error occurred: {str(e)}")
+            if interaction.response.is_done():
+                await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
             else:
-                logger.error("Bot channel is not a text channel or was not found")
+                await interaction.response.send_message(f"An error occurred: {str(e)}", ephemeral=True)
 
-    @commands.command()
-    async def update_user(self, ctx):
-        if ctx.channel.id != BOT_CHANNEL_ID:
+    @discord.app_commands.command(name="update_user", description="Update users in database (bot channel only)")
+    @discord.app_commands.check(admin_or_role_check)
+    async def update_user(self, interaction: discord.Interaction):
+        if interaction.channel and interaction.channel.id != BOT_CHANNEL_ID:
+            await interaction.response.send_message("This command can only be used in the bot channel.", ephemeral=True)
             return
+        
+        await interaction.response.defer()
         async with self.bot.db.pool.acquire() as db:
             result = await db.fetch("SELECT discord_id FROM players;")
             db_id_list = [x[0] for x in result]
@@ -86,18 +103,20 @@ class Commands(commands.Cog):
                     pievienots = True
 
             if pievienots:
-                await ctx.send(f'{users.removesuffix(", ")} datubāzei.')
+                await interaction.followup.send(f'{users.removesuffix(", ")} datubāzei.')
             if not pievienots:
-                await ctx.send("Nevienu nepievienoja datubāzei.")
+                await interaction.followup.send("Nevienu nepievienoja datubāzei.")
 
-    # purge discord roles from players that arent linked in the database.
-    @commands.command()
-    async def purge_roles(self, ctx):
+    @discord.app_commands.command(name="purge_roles", description="Purge discord roles from players that aren't linked in the database")
+    @discord.app_commands.check(admin_or_role_check)
+    async def purge_roles(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         async with self.bot.db.pool.acquire() as db:
             result = await db.fetch(
                 "SELECT discord_id FROM players WHERE osu_id IS NOT NULL;"
             )
             db_id_list = [x[0] for x in result]
+            purged_count = 0
             for member in self.bot.lvguild.members:
                 if member.id not in db_id_list:
                     current_role_id = [
@@ -107,8 +126,10 @@ class Commands(commands.Cog):
                         role = get(self.bot.lvguild.roles, id=current_role_id[0])
                         if role:
                             await member.remove_roles(role)
-                            await ctx.send(f"purged role for {member.display_name}")
+                            purged_count += 1
+            
+            await interaction.followup.send(f"Purged roles for {purged_count} member(s).")
 
 
 async def setup(bot):
-    await bot.add_cog(Commands(bot))
+    await bot.add_cog(Commands(bot), guild=discord.Object(id=SERVER_ID))

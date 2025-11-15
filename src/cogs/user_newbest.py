@@ -8,7 +8,7 @@ import time
 import os
 import aiohttp
 from loguru import logger
-from utils import mods_int_from_list
+from utils import mods_int_from_list, admin_or_role_check, BaseCog, wait_for_on_ready
 from pathlib import Path
 
 from config import (
@@ -18,10 +18,11 @@ from config import (
     USER_NEWBEST_LIMIT,
     BOTSPAM_CHANNEL_ID,
     RANK_EMOJI,
+    SERVER_ID,
 )
 
 
-class UserNewbest(commands.Cog):
+class UserNewbest(BaseCog):
     def __init__(self, bot):
         self.bot = bot
         self.user_newbest_loop.start()
@@ -29,14 +30,20 @@ class UserNewbest(commands.Cog):
     def cog_unload(self):
         self.user_newbest_loop.cancel()
 
-    @commands.command()
-    async def start_userbest(self, ctx):
+    @discord.app_commands.command(name="start_userbest", description="Manually trigger the user newbest check")
+    @discord.app_commands.check(admin_or_role_check)
+    async def start_userbest(self, interaction: discord.Interaction):
         try:
+            await interaction.response.defer()
             await self.user_newbest_loop()
+            await interaction.followup.send("User newbest check completed successfully.")
         except Exception as e:
             # logger.error(repr(e))
             logger.exception("error in start_userbest")
-            await ctx.send(f"{repr(e)} in userbest")
+            if interaction.response.is_done():
+                await interaction.followup.send(f"{repr(e)} in userbest")
+            else:
+                await interaction.response.send_message(f"{repr(e)} in userbest")
 
     @tasks.loop(minutes=60)
     async def user_newbest_loop(self):
@@ -81,6 +88,7 @@ class UserNewbest(commands.Cog):
     @user_newbest_loop.before_loop
     async def before_user_newbest(self):
         await self.bot.wait_until_ready()
+        await wait_for_on_ready(self.bot)
 
     async def get_user_newbest(self, osu_id, limit, last_checked):
         user_scores = await self.bot.osuapi.get_scores(
@@ -181,4 +189,4 @@ class UserNewbest(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(UserNewbest(bot))
+    await bot.add_cog(UserNewbest(bot), guild=discord.Object(id=SERVER_ID))
