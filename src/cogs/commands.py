@@ -12,6 +12,7 @@ from config import (
     SERVER_ID,
 )
 from utils import admin_or_role_check, BaseCog, update_users_in_database
+from .roles import RolesCog
 
 
 class Commands(BaseCog):
@@ -111,6 +112,8 @@ class Commands(BaseCog):
                     f"An error occurred: {str(e)}", ephemeral=True
                 )
 
+
+
     @discord.app_commands.command(
         name="update_user", description="Update users in database (bot channel only)"
     )
@@ -162,6 +165,20 @@ class Commands(BaseCog):
             await interaction.followup.send(
                 f"Purged roles for {purged_count} member(s)."
             )
+
+    @discord.app_commands.command(
+        name="refresh", description="Refresh roles manually"
+    )
+    @discord.app_commands.check(admin_or_role_check)
+    async def refresh(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
+        roles_cog = self.bot.get_cog('RolesCog')
+        if roles_cog is not None:
+            await roles_cog.refresh_roles()  # type: ignore
+            await interaction.followup.send("Roles refreshed successfully.")
+        else:
+            await interaction.followup.send("RolesCog not found.", ephemeral=True)
+
 
 
 async def setup(bot: OsuBot) -> None:

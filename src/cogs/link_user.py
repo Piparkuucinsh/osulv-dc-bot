@@ -104,7 +104,7 @@ class LinkUser(commands.Cog):
                                                     )
                                                     if ctx:
                                                         await ctx.send(
-                                                            f"Pievienoja {member.mention} datubāzei ar osu! kontu {osu_user.username} (id: {osu_user.id})",
+                                                            f"Pievienoja {member.mention} datubāzei ar osu! kontu {osu_user.username} (acc: https://osu.ppy.sh/users/{osu_user.id})",
                                                             allowed_mentions=discord.AllowedMentions(
                                                                 users=False
                                                             ),

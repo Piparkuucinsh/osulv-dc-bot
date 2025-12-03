@@ -62,6 +62,8 @@ class OsuBot(commands.Bot):
         await self.load_extension("cogs.link_user")
         await self.load_extension("cogs.roles")
         await self.load_extension("cogs.user_newbest")
+        await self.load_extension("cogs.global_top50")
+        await self.load_extension("cogs.daily_challenge")
 
     async def on_ready(self) -> None:
         guildstring = ""

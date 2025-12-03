@@ -1,7 +1,8 @@
+import discord
 from discord.ext import commands, tasks
 from discord.utils import get
 from loguru import logger
-from config import ROLES, REV_ROLES, ROLES_VALUE
+from config import ROLES, REV_ROLES, ROLES_VALUE, SERVER_ID
 from app import OsuBot
 
 from utils import (
@@ -21,8 +22,7 @@ class RolesCog(commands.Cog):
     async def cog_unload(self) -> None:
         self.refresh_roles.cancel()
 
-    @tasks.loop(minutes=15)
-    async def refresh_roles(self) -> None:
+    async def _refresh_roles(self) -> None:
         logger.info("Starting refresh_roles task execution")
         try:
             # ctx = self.bot.get_channel(BOT_CHANNEL_ID)
@@ -93,6 +93,7 @@ class RolesCog(commands.Cog):
                                     discord_id=row[0],
                                     notikums="restricted",
                                     osu_user=None,
+                                    osu_id=row[1],
                                 )
                                 continue
                             if ROLES[current_role[0]] != ROLES["restricted"]:
@@ -107,6 +108,7 @@ class RolesCog(commands.Cog):
                                     discord_id=row[0],
                                     notikums="restricted",
                                     osu_user=None,
+                                    osu_id=row[1],
                                 )
                             continue
 
@@ -205,11 +207,16 @@ class RolesCog(commands.Cog):
         except Exception:
             logger.exception("error in refresh_roles")
 
+    @tasks.loop(minutes=15)
+    async def refresh_roles(self) -> None:
+        await self._refresh_roles()
+
     @refresh_roles.before_loop
     async def before_refresh_roles(self) -> None:
         await self.bot.wait_until_ready()
         await wait_for_on_ready(self.bot)
-
+        
+    
 
 async def setup(bot: OsuBot) -> None:
-    await bot.add_cog(RolesCog(bot))
+    await bot.add_cog(RolesCog(bot), guild=discord.Object(id=SERVER_ID))
