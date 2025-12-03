@@ -14,6 +14,7 @@ dependencies = [
     "python-dotenv",
     "rosu-pp-py",
     "ruff",
+    "ossapi",
 ]
 
 [tool.ruff]
